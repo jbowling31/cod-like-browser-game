@@ -1,0 +1,377 @@
+﻿/* =========================================
+   Global / Page
+========================================= */
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1020;
+}
+
+/* Main view container */
+#cityView {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Clipped window (what you interact with) */
+#cityViewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;          /* prevents browser gestures */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+#cityViewport:active {
+  cursor: grabbing;
+}
+
+/* Panned/zoomed content container */
+#cityContent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* =========================================
+   Base Map
+========================================= */
+#cityBase {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+
+  /* Your map size */
+  width: 1600px;
+  height: auto;
+
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+
+  z-index: 1;
+}
+
+/* =========================================
+   Debug Grid
+========================================= */
+#gridCanvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* =========================================
+   Plots Layer
+========================================= */
+#plotsLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  z-index: 3;
+}
+
+/* Debug clickable areas (you can remove later) */
+.plot {
+  position: absolute;
+  cursor: pointer;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.plot:hover {
+  outline: 2px dashed rgba(255, 255, 255, 0.6);
+}
+
+/* Locked plots */
+.plot.locked {
+  cursor: not-allowed;
+  background: rgba(255, 0, 0, 0.06);
+  outline: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.plot.locked:hover {
+  outline: 1px dashed rgba(255, 255, 255, 0.20);
+}
+
+/* =========================================
+   UI Layer (fixed on screen)
+========================================= */
+#uiLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud {
+  pointer-events: auto;
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.45);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  font-size: 14px;
+  line-height: 1.35;
+  backdrop-filter: blur(6px);
+}
+
+.panel {
+  pointer-events: auto;
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 220px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  font-family: ui-sans-serif, system-ui;
+  backdrop-filter: blur(8px);
+}
+
+.panel h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+}
+
+.panel button {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: #4ade80;
+  color: #06210f;
+  font-weight: 600;
+}
+
+.panel button:hover {
+  background: #22c55e;
+}
+
+/* =========================================
+   Modal
+========================================= */
+.hidden {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 9999;
+}
+
+.modal {
+  width: min(420px, calc(100vw - 40px));
+  background: rgba(18, 18, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 16px;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.modal-body {
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn.ghost {
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.btn.primary {
+  background: #4ade80;
+  color: #052012;
+}
+
+.btn.primary:hover {
+  background: #22c55e;
+}
+
+/* =========================================
+   Buildings (WRAPPER-BASED)
+   - Wrapper handles translate positioning (no jump)
+   - Image handles scale animation (no snap)
+========================================= */
+#buildingsLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;            /* above map, below plots */
+  pointer-events: none;  /* layer ignores clicks */
+}
+
+/* The wrapper is what is placed at plot x/y */
+.building-wrap {
+  position: absolute;
+  transform-origin: 50% 100%;
+  pointer-events: none; /* wrapper doesn't steal clicks */
+}
+
+/* The actual sprite can be clicked */
+.building-sprite{
+  position:absolute;
+  height:auto;
+  pointer-events:auto;
+  cursor:pointer;
+
+  /* THIS is what prevents bottom-right drift */
+  transform: translate(-50%, -88%);
+  transform-origin: 50% 100%;
+
+
+
+  /* Base shadow (no glow by default) */
+  filter:
+    drop-shadow(0 14px 12px rgba(0, 0, 0, 0.35))
+    drop-shadow(0 30px 20px rgba(0, 0, 0, 0.20));
+
+  transition: filter 120ms ease;
+}
+
+/* Glow ONLY when selected */
+.building-sprite.selected {
+  filter:
+    drop-shadow(0 0 10px rgba(80, 200, 255, 0.65))
+    drop-shadow(0 14px 12px rgba(0, 0, 0, 0.35))
+    drop-shadow(0 30px 20px rgba(0, 0, 0, 0.20));
+}
+
+/* Sizes by tier (tweak if you want) */
+.building-sprite[data-level="1"],
+.building-sprite[data-level="2"],
+.building-sprite[data-level="3"],
+.building-sprite[data-level="4"] { width: 300px; }
+
+.building-sprite[data-level="5"],
+.building-sprite[data-level="6"],
+.building-sprite[data-level="7"],
+.building-sprite[data-level="8"],
+.building-sprite[data-level="9"] { width: 280px; }
+
+.building-sprite[data-level="10"],
+.building-sprite[data-level="11"],
+.building-sprite[data-level="12"],
+.building-sprite[data-level="13"],
+.building-sprite[data-level="14"],
+.building-sprite[data-level="15"] { width: 320px; }
+
+.building-sprite[data-level="16"],
+.building-sprite[data-level="17"],
+.building-sprite[data-level="18"],
+.building-sprite[data-level="19"],
+.building-sprite[data-level="20"] { width: 340px; }
+
+/* Placement by tier (these are the “feet” offsets you tuned) */
+.building-wrap[data-level="1"],
+.building-wrap[data-level="2"],
+.building-wrap[data-level="3"],
+.building-wrap[data-level="4"] {
+  transform: translate(-50%, -82%);
+}
+
+.building-wrap[data-level="5"],
+.building-wrap[data-level="6"],
+.building-wrap[data-level="7"],
+.building-wrap[data-level="8"],
+.building-wrap[data-level="9"],
+.building-wrap[data-level="10"],
+.building-wrap[data-level="11"],
+.building-wrap[data-level="12"],
+.building-wrap[data-level="13"],
+.building-wrap[data-level="14"],
+.building-wrap[data-level="15"] {
+  transform: translate(-50%, -88%);
+}
+
+.building-wrap[data-level="16"],
+.building-wrap[data-level="17"],
+.building-wrap[data-level="18"],
+.building-wrap[data-level="19"],
+.building-wrap[data-level="20"] {
+  transform: translate(-50%, -84%);
+}
+
+/* Upgrade/build animation (scale only, no translate = no jump) */
+@keyframes buildPop {
+  0%   { opacity: 0; transform: scale(0.70); }
+  60%  { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1.00); }
+}
+
+.building-sprite.pop {
+  animation: buildPop 260ms ease-out;
+}
+/* The buildings layer should never block camera/plot interactions */
+#buildingsLayer,
+.building-wrap {
+  pointer-events: none;
+}
+
+/* But the actual sprite image can be clickable */
+.building-sprite {
+  pointer-events: auto;
+}
+.plot-debug{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  padding:2px 6px;
+  font-size:12px;
+  background:rgba(0,0,0,.65);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.35);
+  border-radius:999px;
+  pointer-events:none;
+  z-index: 9999;
+}

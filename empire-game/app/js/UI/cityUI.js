@@ -1,0 +1,8 @@
+import { BUILDING_TYPES } from "../data/buildingcatalog.js";
+
+const BUILD_OPTIONS = [
+  BUILDING_TYPES.FARM,
+  BUILDING_TYPES.LUMBER,
+  BUILDING_TYPES.QUARRY,
+  BUILDING_TYPES.MINE,
+];
