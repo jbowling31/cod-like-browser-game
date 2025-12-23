@@ -1,6 +1,7 @@
 ﻿import { plots } from "./plots.js";
 import { state } from "./state.js";
 import { fallbackTierKeys } from "./data/buildingcatalog.js";
+import { showPlotPopup } from "./cityUI.js";
 
 const camera = {
   x: 0,

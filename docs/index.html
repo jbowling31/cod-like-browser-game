@@ -2,52 +2,243 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Empire – City</title>
-  <link rel="stylesheet" href="./css/main.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Empire</title>
+
+  <style>
+    html, body { height:100%; margin:0; background:#0f1220; overflow:hidden; }
+    canvas{
+      position:fixed; inset:0; width:100%; height:100%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      touch-action:none;
+    }
+    #hud{
+      position:fixed; left:10px; top:10px; z-index:20;
+      font:12px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      color:#e5e7eb; background:rgba(0,0,0,.45);
+      padding:8px 10px; border-radius:10px; pointer-events:none;
+    }
+
+    #buildPopup{
+      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+      min-width:260px; max-width:340px;
+      background:rgba(0,0,0,.78); color:#fff;
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:14px; padding:12px;
+      display:none; z-index:50;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      backdrop-filter: blur(6px);
+    }
+    #buildTitle{ font-weight:800; margin-bottom:8px; }
+    #buildGrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .buildBtn{
+      padding:10px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.22);
+      background:rgba(255,255,255,.10);
+      color:#fff; cursor:pointer;
+    }
+    .buildBtn:hover{ background:rgba(255,255,255,.16); }
+    .row{ display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
+    .closeBtn{ padding:8px 10px; border-radius:10px; border:0; cursor:pointer; }
+  </style>
 </head>
+
 <body>
-  <div id="cityView">
-    <!-- VIEWPORT: clipped window -->
-    <div id="cityViewport">
-      <!-- CONTENT: this is what gets transformed (pan/zoom) -->
-      <div id="cityContent">
-  <canvas id="gridCanvas"></canvas>
-  <img id="cityBase" src="./assets/city/city_base.png" alt="" />
-  <div id="buildingsLayer"></div>
-  <div id="plotsLayer"></div>
-</div>
+  <canvas id="cityCanvas"></canvas>
+  <div id="hud">Loading…</div>
 
-
-    </div>
-
-    <!-- UI stays unscaled (recommended) -->
-    <div id="uiLayer">
-      <div class="hud">
-        <div><strong>Pan:</strong> Drag</div>
-        <div><strong>Zoom:</strong> Mouse wheel</div>
-        <div><strong>Reset:</strong> Double-click</div>
-        <div id="hudSelected">Selected: none</div>
-      </div>
+  <!-- Build Popup -->
+  <div id="buildPopup">
+    <div id="buildTitle">Build</div>
+    <div id="buildGrid"></div>
+    <div class="row">
+      <button id="buildClose" class="closeBtn">Close</button>
     </div>
   </div>
-<div id="buildPanel" class="panel hidden">
-  <h3 id="panelTitle"></h3>
-  <button id="buildBtn">Build</button>
-</div>
 
-<div id="modalBackdrop" class="modal-backdrop hidden">
-  <div class="modal">
-    <div class="modal-title" id="modalTitle">Town Hall</div>
-    <div class="modal-body" id="modalBody">Build the Town Hall?</div>
+  <script type="module">
+    import { createCityScene } from "./js/cityScene.js";
+    import { CITY_PLOTS } from "./js/plots.city.js";
+    import { BUILDINGS } from "./js/data/buildingCatalog.js";
+    import { createCityBuildingsSystem } from "./js/systems/cityBuildings.js";
+    import { state } from "./js/state.js";
+    import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
 
-    <div class="modal-actions">
-      <button id="modalCancel" class="btn ghost">Close</button>
-      <button id="modalConfirm" class="btn primary">Build</button>
-    </div>
-  </div>
-</div>
+    const BASE_MAP_SRC = "./assets/maps/city/city_tilemap_base.png";
+    const BUILDING_BASE_PATH = "./assets/city";
 
-  <script type="module" src="./js/app.js"></script>
+    // ===== Boot scene =====
+    const canvas = document.getElementById("cityCanvas");
+    const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC });
+    scene.setPlots(CITY_PLOTS);
+
+    const buildings = createCityBuildingsSystem({ basePath: BUILDING_BASE_PATH });
+    scene.setBuildingsSystem(buildings);
+
+    // Ensure Town Hall exists at L1
+    await buildings.ensureTownhall("townhall");
+
+    // ===== Build Popup =====
+    const popup = document.getElementById("buildPopup");
+    const title = document.getElementById("buildTitle");
+    const grid  = document.getElementById("buildGrid");
+    const close = document.getElementById("buildClose");
+
+    popup.style.display = "none";
+    close.onclick = () => popup.style.display = "none";
+
+    let userInteracted = false;
+    window.addEventListener("pointerdown", () => userInteracted = true, { once:true });
+
+    function openBuildPopup(plot) {
+      if (!userInteracted) return;
+
+      const existing = buildings.getPlacedOnPlot(plot.id);
+      title.textContent = existing ? `Plot: ${plot.id} (Occupied)` : `Plot: ${plot.id} (Build)`;
+      grid.innerHTML = "";
+
+      // OCCUPIED: upgrade
+      if (existing) {
+        const lvl = existing.level ?? 1;
+
+        const info = document.createElement("div");
+        info.style.gridColumn = "1 / -1";
+        info.textContent = `Built: ${BUILDINGS[existing.buildingId].name} (Lv ${lvl})`;
+        grid.appendChild(info);
+
+        const chk = buildings.canUpgradePlot(plot.id);
+
+        const upBtn = document.createElement("button");
+        upBtn.className = "buildBtn";
+        upBtn.style.gridColumn = "1 / -1";
+        upBtn.textContent = chk.ok ? `Upgrade → Lv ${lvl + 1}` : "Upgrade Locked";
+
+        if (!chk.ok) {
+          upBtn.disabled = true;
+          upBtn.style.opacity = "0.35";
+          grid.appendChild(upBtn);
+
+          const reason = document.createElement("div");
+          reason.style.gridColumn = "1 / -1";
+          reason.style.fontSize = "12px";
+          reason.style.opacity = "0.9";
+          reason.textContent = chk.reason;
+          grid.appendChild(reason);
+        } else {
+          upBtn.onclick = async () => {
+            await buildings.upgradePlot(plot.id);
+            openBuildPopup(plot); // refresh
+          };
+          grid.appendChild(upBtn);
+        }
+
+        popup.style.display = "block";
+        return;
+      }
+
+      // EMPTY: build menu
+      for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")) {
+        const btn = document.createElement("button");
+        btn.className = "buildBtn";
+        btn.textContent = BUILDINGS[bKey].name;
+
+        const gate = buildings.canBuildBuilding(bKey);
+        if (!gate.ok) {
+          btn.disabled = true;
+          btn.style.opacity = "0.35";
+          btn.title = gate.reason;
+        } else {
+          btn.onclick = async () => {
+            await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
+            popup.style.display = "none";
+          };
+        }
+        grid.appendChild(btn);
+      }
+
+      popup.style.display = "block";
+    }
+
+    scene.setOnPlotClick(openBuildPopup);
+
+    // ===== Sync placed buildings -> state levels (for economy) =====
+    function syncLevelsFromPlaced() {
+      const lv = (state.buildings.levels ||= {});
+
+      // track these (economy reads these keys)
+      lv.townhall = 0;
+      lv.house = 0;
+      lv.farm = 0;
+      lv.lumber = 0;
+      lv.quarry = 0;
+      lv.mine = 0;
+
+      // if your catalog uses different ids, map them here
+      const alias = {
+        town_hall: "townhall",
+        lumbermill: "lumber",
+        lumberyard: "lumber",
+        wood: "lumber",
+        stone: "quarry",
+        ore: "mine",
+        homes: "house",
+        housing: "house",
+        cottage: "house",
+        houses: "house",
+      };
+
+      for (const plot of CITY_PLOTS) {
+        const placed = buildings.getPlacedOnPlot(plot.id);
+        if (!placed) continue;
+
+        const raw = placed.buildingId;
+        const key = alias[raw] || raw;
+        const lvl = placed.level ?? 1;
+
+        if (Object.prototype.hasOwnProperty.call(lv, key)) {
+          lv[key] = lvl;
+        }
+      }
+
+      // keep legacy field in sync if anything else uses it
+      state.buildings.townhallLevel = lv.townhall || 0;
+    }
+
+    // ===== HUD + Economy loop =====
+    const hud = document.getElementById("hud");
+    const fmt = (n) => Math.floor(n || 0).toLocaleString();
+    const fmtRate = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString();
+
+    let econLast = 0;
+    function economyFrame(t) {
+      const dt = econLast ? (t - econLast) / 1000 : 0;
+      econLast = t;
+
+      syncLevelsFromPlaced();
+      updateEconomy(dt);
+
+      const p = getProductionPerSecond();
+      hud.innerHTML = `
+        <div><b>Food:</b> ${fmt(state.resources.food)} (+${fmtRate(p.food)}/s)</div>
+        <div><b>Wood:</b> ${fmt(state.resources.wood)} (+${fmtRate(p.wood)}/s)</div>
+        <div><b>Stone:</b> ${fmt(state.resources.stone)} (+${fmtRate(p.stone)}/s)</div>
+        <div><b>Ore:</b> ${fmt(state.resources.ore)} (+${fmtRate(p.ore)}/s)</div>
+        <div><b>Gold:</b> ${fmt(state.resources.gold)} (+${fmtRate(p.gold)}/s)</div>
+        <div style="opacity:.7;margin-top:6px">TH=${state.buildings.levels.townhall||0} • House=${state.buildings.levels.house||0}</div>
+      `;
+
+      requestAnimationFrame(economyFrame);
+    }
+    requestAnimationFrame(economyFrame);
+
+    // ===== Main loop =====
+    function frame() {
+      scene.update();
+      scene.render();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  </script>
 </body>
 </html>

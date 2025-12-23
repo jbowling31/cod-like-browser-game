@@ -48,6 +48,9 @@ html, body {
   left: 0;
   top: 0;
   display: block;
+    
+  opacity: 0;          /* invisible but still has size */
+  pointer-events: none;
 
   /* Your map size */
   width: 1600px;
@@ -375,3 +378,28 @@ html, body {
   pointer-events:none;
   z-index: 9999;
 }
+#buildingsLayer { pointer-events: none; }
+#plotsLayer .plotHitbox { pointer-events: auto; }
+
+.building-sprite{
+  /* soft contact shadow */
+  filter: drop-shadow(0 14px 14px rgba(0,0,0,.22));
+}
+.building-sprite{
+  filter:
+    drop-shadow(0 14px 14px rgba(0,0,0,.22))
+    saturate(0.92)
+    contrast(0.96)
+    brightness(0.98);
+}
+.building-sprite{
+  image-rendering: auto;
+  /* micro-soften the cutout edge */
+  filter: drop-shadow(0 14px 14px rgba(0,0,0,.22));
+}
+#cityCanvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#buildPopup { z-index: 9999; }
