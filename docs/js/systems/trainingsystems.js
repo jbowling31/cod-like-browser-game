@@ -1,4 +1,4 @@
-// docs/js/systems/trainingsystem.js
+// docs/js/systems/trainingsystems.js
 import { state } from "../state.js";
 import { TROOPS, BARRACKS_TIER_UNLOCK } from "../data/troopsCatalog.js";
 
@@ -170,7 +170,7 @@ export function processTrainingQueues() {
   }
 }
 
-// docs/js/systems/trainingsystem.js
+// docs/js/systems/trainingsystems.js
 
 export function getTrainingSnapshot(buildingId = "barracks") {
   ensureTrainingState();

@@ -1,5 +1,5 @@
 // docs/js/systems/citybuildings.js
-import { BUILDINGS } from "../data/buildingcatalog.js"; // ✅ correct casing
+import { BUILDINGS } from "../data/buildingCatalog.js"; // ✅ correct casing
 import { loadBuildingSprite } from "./assets.js";
 import { state } from "../state.js";
 
