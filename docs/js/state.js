@@ -1,4 +1,4 @@
-﻿// docs/js/state.js (or wherever your state.js lives)
+// docs/js/state.js (or wherever your state.js lives)
 export const STARTING_RESOURCES = {
   food: 500,
   wood: 500,

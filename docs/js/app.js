@@ -1,4 +1,4 @@
-﻿import { initCity } from "./city.js";
+import { initCity } from "./city.js";
 
 window.addEventListener("DOMContentLoaded", () => {
   initCity(
@@ -15,7 +15,7 @@ const CLICK_DRAG_THRESHOLD = 6; // px
 
   // Also make sure cityContent bounds match the image (important for hit testing)
   // (Not strictly required, but helps keep everything aligned.)
-// ✅ Run once now and again after image is definitely painted
+// ? Run once now and again after image is definitely painted
 if (base.complete) {
   requestAnimationFrame(() => {
     syncOverlayToImage();

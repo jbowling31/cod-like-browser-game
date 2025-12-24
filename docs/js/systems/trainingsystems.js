@@ -170,7 +170,7 @@ export function processTrainingQueues() {
   }
 }
 
-// docs/js/systems/trainingSystem.js
+// docs/js/systems/trainingsystem.js
 
 export function getTrainingSnapshot(buildingId = "barracks") {
   ensureTrainingState();

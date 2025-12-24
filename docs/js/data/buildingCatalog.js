@@ -1,4 +1,4 @@
-// docs/js/data/buildingCatalog.js
+// docs/js/data/buildingcatalog.js
 
 export const LEVEL_KEYS = ["L1", "L5", "L10", "L15", "L20"];
 

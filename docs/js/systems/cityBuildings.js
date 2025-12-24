@@ -1,5 +1,5 @@
-// docs/js/systems/cityBuildings.js
-import { BUILDINGS } from "../data/buildingCatalog.js"; // ✅ correct casing
+// docs/js/systems/citybuildings.js
+import { BUILDINGS } from "../data/buildingcatalog.js"; // ✅ correct casing
 import { loadBuildingSprite } from "./assets.js";
 import { state } from "../state.js";
 
@@ -26,7 +26,7 @@ function tierKeyForLevel(level) {
   return "L1";
 }
 
-export function createCityBuildingsSystem({ basePath }) {
+export function createcitybuildingsSystem({ basePath }) {
   const placed = new Map(); // plotId -> instance
 
   // Building becomes placeable when Town Hall reaches this level.

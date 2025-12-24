@@ -1,4 +1,4 @@
-﻿export const plots = [
+export const plots = [
   // Town Hall (center)
   { id: "townhall", x: 43, y: 52, w: 18, h: 14 },
 

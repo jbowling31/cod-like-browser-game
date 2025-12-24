@@ -1,5 +1,5 @@
 // app/js/systems/buildingMath.js
-import { BUILDING_TYPES, BUILDING_CATALOG, clampLevel } from "../data/buildingCatalog.js";
+import { BUILDING_TYPES, BUILDING_CATALOG, clampLevel } from "../data/buildingcatalog.js";
 
 /**
  * Production curve:
