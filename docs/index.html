@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -313,7 +313,7 @@
     import { createCityScene } from "./js/cityScene.js";
     import { CITY_PLOTS } from "./js/plots.city.js";
     import { BUILDINGS } from "./js/data/buildingCatalog.js";
-    import { createCityBuildingsSystem } from "./js/systems/cityBuildings.js"; // ? casing
+    import { createcitybuildingsSystem } from "./js/systems/cityBuildings.js"; // ? casing
     import { state } from "./js/state.js";
     import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
     import { processTrainingQueues } from "./js/systems/trainingsystems.js";
@@ -335,7 +335,7 @@
     const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC });
     scene.setPlots(CITY_PLOTS);
 
-    const buildings = createCityBuildingsSystem({ basePath: BUILDING_BASE_PATH });
+    const buildings = createcitybuildingsSystem({ basePath: BUILDING_BASE_PATH });
     scene.setBuildingsSystem(buildings);
 
     const hasPendingLoad = !!sessionStorage.getItem(PENDING_KEY);
