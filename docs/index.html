@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -313,7 +313,7 @@
     import { createCityScene } from "./js/cityScene.js";
     import { CITY_PLOTS } from "./js/plots.city.js";
     import { BUILDINGS } from "./js/data/buildingCatalog.js";
-    import { createcitybuildingsSystem } from "./js/systems/citybuildings.js"; // ? casing
+    import { createCityBuildingsSystem } from "./js/systems/cityBuildings.js"; // ? casing
     import { state } from "./js/state.js";
     import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
     import { processTrainingQueues } from "./js/systems/trainingsystems.js";
@@ -335,7 +335,7 @@
     const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC });
     scene.setPlots(CITY_PLOTS);
 
-    const buildings = createcitybuildingsSystem({ basePath: BUILDING_BASE_PATH });
+    const buildings = createCityBuildingsSystem({ basePath: BUILDING_BASE_PATH });
     scene.setBuildingsSystem(buildings);
 
     const hasPendingLoad = !!sessionStorage.getItem(PENDING_KEY);
@@ -451,14 +451,14 @@
     }
 
     function fmtCostPretty(cost){
-      if (!cost) return "�";
+      if (!cost) return "?";
       const parts = [];
       if (cost.food)  parts.push(`F:${cost.food}`);
       if (cost.wood)  parts.push(`W:${cost.wood}`);
       if (cost.stone) parts.push(`S:${cost.stone}`);
       if (cost.ore)   parts.push(`O:${cost.ore}`);
       if (cost.gold)  parts.push(`G:${cost.gold}`);
-      return parts.length ? parts.join("  ") : "�";
+      return parts.length ? parts.join("  ") : "?";
     }
 
     function isResourceUnlocked(res) {
@@ -721,7 +721,7 @@
           <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <b>Slot ${i+1}</b>
-              <span style="opacity:.9">${s.troopId} � ${s.amount}</span>
+              <span style="opacity:.9">${s.troopId} ? ${s.amount}</span>
             </div>
 
             <div style="margin-top:10px; height:10px; background:rgba(255,255,255,.12); border-radius:999px; overflow:hidden;">
