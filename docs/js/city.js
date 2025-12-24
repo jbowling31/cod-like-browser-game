@@ -1,4 +1,4 @@
-﻿// docs/js/city.js
+// docs/js/city.js
 import { plots } from "./plots.js";
 import { state } from "./state.js";
 import { showPlotPopup } from "./UI/cityUI.js";
@@ -21,8 +21,8 @@ let rafPending = false;
 let showGrid = false;
 const TOWNHALL_MAX_LEVEL = 20;
 
-// ? IMPORTANT: your UI imports this. We�re tile-only right now, so it�s a safe stub.
-// If/when we bring buildings back, we�ll replace this with your real DOM building renderer.
+// ? IMPORTANT: your UI imports this. We?re tile-only right now, so it?s a safe stub.
+// If/when we bring buildings back, we?ll replace this with your real DOM building renderer.
 export function renderBuildings() {
   // no-op for now (tile scene handles visuals)
 }
@@ -110,7 +110,7 @@ requestAnimationFrame(econFrame);
       // center around x/y
       el.style.transform = "translate(-50%, -50%)";
 
-      // don�t let clicking plots start a pan
+      // don?t let clicking plots start a pan
       el.addEventListener("pointerdown", (e) => e.stopPropagation());
 
       el.addEventListener("pointerup", (e) => {
