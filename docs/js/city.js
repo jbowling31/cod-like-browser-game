@@ -4,7 +4,7 @@ import { state } from "./state.js";
 import { showPlotPopup } from "./UI/cityUI.js";
 import { createProceduralCityRenderer } from "./proceduralCityRenderer.js";
 import { updateEconomy, getProductionPerSecond } from "./systems/cityeconomy.js";
-import { processTrainingQueues } from "./js/systems/trainingsystem.js";
+import { processTrainingQueues } from "./js/systems/trainingsystems.js";
 
 
 
