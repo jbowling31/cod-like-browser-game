@@ -7,68 +7,328 @@
 
   <style>
     html, body { height:100%; margin:0; background:#0f1220; overflow:hidden; }
+
     canvas{
       position:fixed; inset:0; width:100%; height:100%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       touch-action:none;
-    }
-    #hud{
-      position:fixed; left:10px; top:10px; z-index:20;
-      font:12px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      color:#e5e7eb; background:rgba(0,0,0,.45);
-      padding:8px 10px; border-radius:10px; pointer-events:none;
+      display:block;
     }
 
-    #buildPopup{
-      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
-      min-width:260px; max-width:340px;
-      background:rgba(0,0,0,.78); color:#fff;
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:14px; padding:12px;
-      display:none; z-index:50;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      backdrop-filter: blur(6px);
+    /* ===== UI overlay that is CLIPPED to the visible on-screen map rect ===== */
+    #uiOverlay{
+      position:fixed;
+      left:0; top:0;
+      width:0; height:0;
+      overflow:hidden;
+      pointer-events:none;
+      z-index:1000;
     }
-    #buildTitle{ font-weight:800; margin-bottom:8px; }
-    #buildGrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+    /* ============== RESOURCE BAR (bigger + cooler) ============== */
+    #resourceBar{
+      position:absolute;
+      left:0; top:0; right:0;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+
+      padding:12px 14px;
+      background:linear-gradient(180deg, rgba(10,14,30,.92), rgba(0,0,0,.55));
+      color:#eaf0ff;
+      font:14px/1.15 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      border-bottom:1px solid rgba(255,255,255,.12);
+
+      pointer-events:auto;
+      user-select:none;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+
+      box-shadow:
+        0 10px 30px rgba(0,0,0,.35),
+        inset 0 -1px 0 rgba(255,255,255,.06);
+    }
+
+    #resourceLeft{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:center;
+    }
+
+    .resItem{
+      display:flex;
+      gap:8px;
+      align-items:baseline;
+      padding:6px 10px;
+      border-radius:12px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+      white-space:nowrap;
+    }
+
+    .resItem b{ font-weight:900; letter-spacing:.2px; }
+    .resItem span{ opacity:.8; font-size:12px; margin-left:2px; }
+
+    #resourceRight{ display:flex; gap:10px; align-items:center; }
+
+    #resourceRight button{
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.08);
+      color:#eaf0ff;
+      cursor:pointer;
+      font:13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+
+    #resourceRight button:hover{
+      background:rgba(255,255,255,.14);
+      border-color:rgba(255,255,255,.22);
+      transform: translateY(-1px);
+    }
+
+    #resourceRight button:active{ transform: translateY(0px); }
+
+    /* floating panels container */
+    #floatingPanels{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+    }
+
+    .uiPanel{
+      position:absolute;
+      min-width:280px;
+      max-width:420px;
+      background:rgba(0,0,0,.78);
+      color:#fff;
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:16px;
+      padding:14px;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      pointer-events:auto;
+      box-shadow: 0 14px 40px rgba(0,0,0,.45);
+    }
+
+    /* build popup */
+    #buildPopup{ display:none; }
+    #buildTitle{ font-weight:900; margin-bottom:10px; font-size:14px; }
+    #buildGrid{ display:block; }
+
     .buildBtn{
-      padding:10px; border-radius:12px;
+      padding:12px;
+      border-radius:14px;
       border:1px solid rgba(255,255,255,.22);
       background:rgba(255,255,255,.10);
-      color:#fff; cursor:pointer;
+      color:#fff;
+      cursor:pointer;
+      text-align:left;
+      white-space:pre-line;
+      transition: background 120ms ease, transform 120ms ease;
+      width:100%;
     }
-    .buildBtn:hover{ background:rgba(255,255,255,.16); }
-    .row{ display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
-    .closeBtn{ padding:8px 10px; border-radius:10px; border:0; cursor:pointer; }
+
+    .buildBtn:hover{ background:rgba(255,255,255,.16); transform: translateY(-1px); }
+    .buildBtn:active{ transform: translateY(0px); }
+
+    .row{ display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+    .closeBtn{
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.10);
+      color:#fff;
+      cursor:pointer;
+    }
+    .closeBtn:hover{ background:rgba(255,255,255,.16); }
+
+    /* barracks panel */
+    #barracksPanel{ display:none; width:420px; max-height:70vh; overflow:auto; }
+    #barracksPanel select,
+    #barracksPanel input{
+      pointer-events:auto;
+      touch-action: manipulation;
+    }
+
+    /* ===== Upgrade Card (universal) ===== */
+    .upCard{
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px;
+      padding: 14px;
+      color: #e5e7eb;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 50px rgba(0,0,0,.35);
+    }
+
+    .upTitle{
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: .2px;
+      margin-bottom: 8px;
+      color:#ffffff;
+    }
+
+    .upRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-size: 14px;
+      margin: 6px 0;
+      opacity: .95;
+    }
+
+    .upRow b{ font-weight: 900; }
+    .upCost{ font-weight: 900; letter-spacing: .3px; }
+
+    .upHint{
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: .78;
+      line-height: 1.3;
+    }
+
+    .upBtn{
+      margin-top: 12px;
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 14px;
+      font-weight: 900;
+      font-size: 16px;
+      cursor: pointer;
+      background: #22c55e;
+      color: #06210f;
+      box-shadow: 0 12px 26px rgba(34,197,94,.25);
+    }
+
+    .upBtn:hover{ filter: brightness(1.05); }
+    .upBtn:active{ transform: translateY(1px); }
+
+    .upBtn[disabled]{
+      background: rgba(255,255,255,.10);
+      color: rgba(255,255,255,.45);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .upReason{
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: .85;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.35);
+    }
+
+    /* ===== Barracks panel tabs (Train / Upgrade) ===== */
+    .bxHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .bxClose{
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.10);
+      color:#fff;
+      cursor:pointer;
+    }
+    .bxClose:hover{ background:rgba(255,255,255,.16); }
+
+    .bxWrap{ display:flex; gap:12px; }
+    .bxTabs{
+      width:120px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      padding-right:10px;
+      border-right:1px solid rgba(255,255,255,.10);
+    }
+    .bxTab{
+      width:100%;
+      text-align:left;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      color:#e5e7eb;
+      cursor:pointer;
+      font-weight:900;
+    }
+    .bxTab:hover{ background:rgba(255,255,255,.10); }
+    .bxTab.active{
+      background:rgba(34,197,94,.18);
+      border-color:rgba(34,197,94,.35);
+      color:#eafff2;
+    }
+    .bxMain{ flex:1; min-width:0; }
   </style>
 </head>
 
 <body>
   <canvas id="cityCanvas"></canvas>
-  <div id="hud">Loading…</div>
 
-  <!-- Build Popup -->
-  <div id="buildPopup">
-    <div id="buildTitle">Build</div>
-    <div id="buildGrid"></div>
-    <div class="row">
-      <button id="buildClose" class="closeBtn">Close</button>
+  <div id="uiOverlay">
+    <div id="resourceBar">
+      <div id="resourceLeft"></div>
+      <div id="resourceRight">
+        <button id="btnSave" type="button">Save</button>
+        <button id="btnLoad" type="button">Load</button>
+        <button id="btnReset" type="button">Reset</button>
+      </div>
+    </div>
+
+    <div id="floatingPanels">
+      <div id="buildPopup" class="uiPanel">
+        <div id="buildTitle">Build</div>
+        <div id="buildGrid"></div>
+        <div class="row">
+          <button id="buildClose" class="closeBtn" type="button">Close</button>
+        </div>
+      </div>
+
+      <div id="barracksPanel" class="uiPanel"></div>
     </div>
   </div>
 
   <script type="module">
+    // =========================================================
+    // 1) IMPORTS
+    // =========================================================
     import { createCityScene } from "./js/cityScene.js";
     import { CITY_PLOTS } from "./js/plots.city.js";
     import { BUILDINGS } from "./js/data/buildingCatalog.js";
-    import { createCityBuildingsSystem } from "./js/systems/cityBuildings.js";
+    import { createCityBuildingsSystem } from "./js/systems/cityBuildings.js"; // ✅ casing
     import { state } from "./js/state.js";
     import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
+    import { processTrainingQueues } from "./js/systems/trainingsystem.js";
+    import { getTrainingSnapshot, startTrainingInSlot, cancelTraining, syncBarracksSlots } from "./js/systems/trainingsystem.js";
+    import { TROOPS, BARRACKS_TIER_UNLOCK } from "./js/data/troopsCatalog.js";
 
+    // =========================================================
+    // 2) CONSTANTS
+    // =========================================================
     const BASE_MAP_SRC = "./assets/maps/city/city_tilemap_base.png";
     const BUILDING_BASE_PATH = "./assets/city";
+    const SAVE_KEY = "empire_city_save_v1";
+    const PENDING_KEY = "EMPIRE_PENDING_LOAD";
 
-    // ===== Boot scene =====
+    // =========================================================
+    // 3) BOOT SCENE + SYSTEMS
+    // =========================================================
     const canvas = document.getElementById("cityCanvas");
     const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC });
     scene.setPlots(CITY_PLOTS);
@@ -76,166 +336,706 @@
     const buildings = createCityBuildingsSystem({ basePath: BUILDING_BASE_PATH });
     scene.setBuildingsSystem(buildings);
 
-    // Ensure Town Hall exists at L1
-    await buildings.ensureTownhall("townhall");
+    const hasPendingLoad = !!sessionStorage.getItem(PENDING_KEY);
+    if (!hasPendingLoad) await buildings.ensureTownhall("townhall");
 
-    // ===== Build Popup =====
-    const popup = document.getElementById("buildPopup");
-    const title = document.getElementById("buildTitle");
-    const grid  = document.getElementById("buildGrid");
-    const close = document.getElementById("buildClose");
+    // =========================================================
+    // 4) UI OVERLAY RECT (map -> css px)
+    // =========================================================
+    const uiOverlay = document.getElementById("uiOverlay");
+    const resourceBar = document.getElementById("resourceBar");
+    const resourceLeft = document.getElementById("resourceLeft");
+    const floatingPanels = document.getElementById("floatingPanels");
 
-    popup.style.display = "none";
-    close.onclick = () => popup.style.display = "none";
+    const clamp = (v, a, b) => {
+      v = Number(v);
+      if (!Number.isFinite(v)) return a;
+      return Math.max(a, Math.min(b, v));
+    };
 
+    // ✅ REAL user interaction gate
     let userInteracted = false;
-    window.addEventListener("pointerdown", () => userInteracted = true, { once:true });
+    canvas.addEventListener("pointerdown", () => { userInteracted = true; }, { passive:true });
 
-    function openBuildPopup(plot) {
-      if (!userInteracted) return;
+    let lastUserPointerAt = 0;
+    canvas.addEventListener("pointerdown", () => { lastUserPointerAt = Date.now(); }, { passive:true });
 
-      const existing = buildings.getPlacedOnPlot(plot.id);
-      title.textContent = existing ? `Plot: ${plot.id} (Occupied)` : `Plot: ${plot.id} (Build)`;
-      grid.innerHTML = "";
-
-      // OCCUPIED: upgrade
-      if (existing) {
-        const lvl = existing.level ?? 1;
-
-        const info = document.createElement("div");
-        info.style.gridColumn = "1 / -1";
-        info.textContent = `Built: ${BUILDINGS[existing.buildingId].name} (Lv ${lvl})`;
-        grid.appendChild(info);
-
-        const chk = buildings.canUpgradePlot(plot.id);
-
-        const upBtn = document.createElement("button");
-        upBtn.className = "buildBtn";
-        upBtn.style.gridColumn = "1 / -1";
-        upBtn.textContent = chk.ok ? `Upgrade → Lv ${lvl + 1}` : "Upgrade Locked";
-
-        if (!chk.ok) {
-          upBtn.disabled = true;
-          upBtn.style.opacity = "0.35";
-          grid.appendChild(upBtn);
-
-          const reason = document.createElement("div");
-          reason.style.gridColumn = "1 / -1";
-          reason.style.fontSize = "12px";
-          reason.style.opacity = "0.9";
-          reason.textContent = chk.reason;
-          grid.appendChild(reason);
-        } else {
-          upBtn.onclick = async () => {
-            await buildings.upgradePlot(plot.id);
-            openBuildPopup(plot); // refresh
-          };
-          grid.appendChild(upBtn);
-        }
-
-        popup.style.display = "block";
-        return;
-      }
-
-      // EMPTY: build menu
-      for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")) {
-        const btn = document.createElement("button");
-        btn.className = "buildBtn";
-        btn.textContent = BUILDINGS[bKey].name;
-
-        const gate = buildings.canBuildBuilding(bKey);
-        if (!gate.ok) {
-          btn.disabled = true;
-          btn.style.opacity = "0.35";
-          btn.title = gate.reason;
-        } else {
-          btn.onclick = async () => {
-            await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
-            popup.style.display = "none";
-          };
-        }
-        grid.appendChild(btn);
-      }
-
-      popup.style.display = "block";
+    function isRecentUserClick(){
+      return (Date.now() - lastUserPointerAt) < 800;
     }
 
-    scene.setOnPlotClick(openBuildPopup);
+    function getMapSizeSafe(){
+      const w = (typeof scene.getMapWidth === "function") ? scene.getMapWidth() : 512;
+      const h = (typeof scene.getMapHeight === "function") ? scene.getMapHeight() : 512;
+      return { w, h };
+    }
 
-    // ===== Sync placed buildings -> state levels (for economy) =====
+    function worldToScreenSafe(wx, wy){
+      if (typeof scene.worldToScreen === "function") return scene.worldToScreen(wx, wy);
+      return { x: wx, y: wy };
+    }
+
+    function canvasPxToCssPage(canvasPxX, canvasPxY){
+      const r = canvas.getBoundingClientRect();
+      return {
+        x: r.left + (canvasPxX / canvas.width) * r.width,
+        y: r.top  + (canvasPxY / canvas.height) * r.height
+      };
+    }
+
+    function updateUiOverlayRect(){
+      const { w: mapW, h: mapH } = getMapSizeSafe();
+      const a = worldToScreenSafe(0, 0);
+      const b = worldToScreenSafe(mapW, mapH);
+      const A = canvasPxToCssPage(a.x, a.y);
+      const B = canvasPxToCssPage(b.x, b.y);
+
+      const left   = Math.min(A.x, B.x);
+      const top    = Math.min(A.y, B.y);
+      const right  = Math.max(A.x, B.x);
+      const bottom = Math.max(A.y, B.y);
+
+      uiOverlay.style.left = `${left}px`;
+      uiOverlay.style.top = `${top}px`;
+      uiOverlay.style.width = `${right - left}px`;
+      uiOverlay.style.height = `${bottom - top}px`;
+    }
+
+    // =========================================================
+    // 5) PLACEMENT HELPERS (CENTERED PANELS)
+    // =========================================================
+    function centerPanelOnScreen(panelEl){
+      const r = canvas.getBoundingClientRect();
+      const overlayRect = uiOverlay.getBoundingClientRect();
+
+      panelEl.style.display = "block";
+      panelEl.style.visibility = "hidden";
+      panelEl.style.left = "0px";
+      panelEl.style.top  = "0px";
+
+      const pw = panelEl.offsetWidth;
+      const ph = panelEl.offsetHeight;
+
+      panelEl.style.visibility = "visible";
+
+      const targetPageX = r.left + r.width / 2;
+      const targetPageY = r.top  + r.height / 2;
+
+      const localX = targetPageX - overlayRect.left - pw / 2;
+      const localY = targetPageY - overlayRect.top  - ph / 2;
+
+      const pad = 12;
+      const barH = resourceBar.offsetHeight || 64;
+
+      const x = clamp(localX, pad, Math.max(pad, overlayRect.width - pw - pad));
+      const y = clamp(localY, pad + barH, Math.max(pad + barH, overlayRect.height - ph - pad));
+
+      panelEl.style.left = `${x}px`;
+      panelEl.style.top  = `${y}px`;
+    }
+
+    // =========================================================
+    // 6) COST HELPERS (✅ use buildings map, NOT state.buildings.placed)
+    // =========================================================
+    function fmtCost(cost) {
+      if (!cost) return "";
+      const parts = [];
+      if (cost.food)  parts.push(`F:${cost.food}`);
+      if (cost.wood)  parts.push(`W:${cost.wood}`);
+      if (cost.stone) parts.push(`S:${cost.stone}`);
+      if (cost.ore)   parts.push(`O:${cost.ore}`);
+      if (cost.gold)  parts.push(`G:${cost.gold}`);
+      return parts.length ? parts.join(" ") : "";
+    }
+
+    function fmtCostPretty(cost){
+      if (!cost) return "—";
+      const parts = [];
+      if (cost.food)  parts.push(`F:${cost.food}`);
+      if (cost.wood)  parts.push(`W:${cost.wood}`);
+      if (cost.stone) parts.push(`S:${cost.stone}`);
+      if (cost.ore)   parts.push(`O:${cost.ore}`);
+      if (cost.gold)  parts.push(`G:${cost.gold}`);
+      return parts.length ? parts.join("  ") : "—";
+    }
+
+    function isResourceUnlocked(res) {
+      if (res === "stone") return !!buildings.getByBuildingId?.("quarry");
+      if (res === "ore")   return !!buildings.getByBuildingId?.("mine");
+      return true;
+    }
+
+    function canAfford(cost) {
+      if (!cost) return true;
+      for (const k in cost) {
+        const need = Number(cost[k] ?? 0);
+        if (need <= 0) continue;
+        if (!isResourceUnlocked(k)) return false;
+        if ((state?.resources?.[k] ?? 0) < need) return false;
+      }
+      return true;
+    }
+
+    // =========================================================
+    // 7) BUILD POPUP (✅ instant refresh after upgrade)
+    // =========================================================
+    const popup = document.getElementById("buildPopup");
+    const buildTitle = document.getElementById("buildTitle");
+    const buildGrid = document.getElementById("buildGrid");
+    const buildClose = document.getElementById("buildClose");
+
+    buildClose.onclick = () => { popup.style.display = "none"; };
+    popup.style.display = "none";
+
     function syncLevelsFromPlaced() {
       const lv = (state.buildings.levels ||= {});
-
-      // track these (economy reads these keys)
       lv.townhall = 0;
       lv.house = 0;
       lv.farm = 0;
       lv.lumber = 0;
       lv.quarry = 0;
       lv.mine = 0;
-
-      // if your catalog uses different ids, map them here
-      const alias = {
-        town_hall: "townhall",
-        lumbermill: "lumber",
-        lumberyard: "lumber",
-        wood: "lumber",
-        stone: "quarry",
-        ore: "mine",
-        homes: "house",
-        housing: "house",
-        cottage: "house",
-        houses: "house",
-      };
+      lv.barracks = 0;
+      lv.academy = 0;
+      lv.commandcenter = 0;
 
       for (const plot of CITY_PLOTS) {
         const placed = buildings.getPlacedOnPlot(plot.id);
         if (!placed) continue;
-
-        const raw = placed.buildingId;
-        const key = alias[raw] || raw;
-        const lvl = placed.level ?? 1;
-
-        if (Object.prototype.hasOwnProperty.call(lv, key)) {
-          lv[key] = lvl;
-        }
+        const key = placed.buildingId;
+        if (Object.prototype.hasOwnProperty.call(lv, key)) lv[key] = placed.level ?? 1;
       }
-
-      // keep legacy field in sync if anything else uses it
       state.buildings.townhallLevel = lv.townhall || 0;
     }
 
-    // ===== HUD + Economy loop =====
-    const hud = document.getElementById("hud");
+    function openBuildPopup(plot){
+      if (!userInteracted) return;
+
+      const existing = buildings.getPlacedOnPlot(plot.id);
+      buildGrid.innerHTML = "";
+
+      if (existing) {
+        buildTitle.textContent = `Plot: ${plot.id} (Occupied)`;
+
+        const lvl = existing.level ?? 1;
+        const def = BUILDINGS[existing.buildingId];
+        const name = def?.name || existing.buildingId;
+
+        const chk = buildings.canUpgradePlot(plot.id);
+        const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
+        const affordable = canAfford(upgradeCost);
+
+        buildGrid.innerHTML = `
+          <div class="upCard">
+            <div class="upTitle">${name}</div>
+
+            <div class="upRow">
+              <span>Current Level</span>
+              <b>${lvl}</b>
+            </div>
+
+            <div class="upRow">
+              <span>Cost</span>
+              <span class="upCost">${fmtCostPretty(upgradeCost)}</span>
+            </div>
+
+            <button id="btnUpgrade" class="upBtn"
+              ${(!chk.ok || !affordable || !upgradeCost) ? "disabled" : ""}>
+              Upgrade → Lv ${lvl + 1}
+            </button>
+
+            ${!chk.ok ? `<div class="upReason">${chk.reason}</div>` : ""}
+            ${(chk.ok && upgradeCost && !affordable) ? `<div class="upReason">Not enough resources</div>` : ""}
+          </div>
+        `;
+
+        const upBtn = buildGrid.querySelector("#btnUpgrade");
+        if (upBtn && !upBtn.disabled) {
+          upBtn.onclick = async () => {
+            const prevLevel = (buildings.getPlacedOnPlot(plot.id)?.level ?? 1);
+            const res = await buildings.upgradePlot(plot.id);
+
+            if (!res?.ok) {
+              alert(res?.reason || "Upgrade failed");
+              return;
+            }
+
+            // ✅ keep state levels in sync for HUD + anything else reading them
+            syncLevelsFromPlaced();
+
+            // ✅ immediate UI refresh from authoritative map
+            openBuildPopup(plot);
+            centerPanelOnScreen(popup);
+          };
+        }
+
+        popup.style.display = "block";
+        centerPanelOnScreen(popup);
+        return;
+      }
+
+      // EMPTY plot: build menu
+      buildTitle.textContent = `Plot: ${plot.id} (Build)`;
+      for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")) {
+        const def = BUILDINGS[bKey];
+        const cost = def?.cost || null;
+
+        const btn = document.createElement("button");
+        btn.className = "buildBtn";
+        btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCost(cost)}` : ""}`;
+
+        const gate = buildings.canBuildBuilding?.(bKey) ?? { ok:true };
+
+        if (!gate.ok) {
+          btn.disabled = true;
+          btn.style.opacity = "0.35";
+          btn.title = gate.reason;
+        } else if (cost && !canAfford(cost)) {
+          btn.disabled = true;
+          btn.style.opacity = "0.35";
+          btn.title = "Not enough resources";
+        } else {
+          btn.onclick = async () => {
+            const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
+            if (r && r.ok === false) alert(r.reason || "Could not build.");
+            syncLevelsFromPlaced();
+            popup.style.display = "none";
+          };
+        }
+
+        buildGrid.appendChild(btn);
+      }
+
+      popup.style.display = "block";
+      centerPanelOnScreen(popup);
+    }
+
+    // =========================================================
+    // 8) BARRACKS PANEL (your existing code left mostly intact)
+    // =========================================================
+    const barracksPanel = document.getElementById("barracksPanel");
+    barracksPanel.style.display = "none";
+
+    let barracksUserEditing = false;
+    let barracksTab = "train";
+    let barracksRafPending = false;
+
+    barracksPanel.addEventListener("pointerdown", (e) => {
+      const t = e.target;
+      if (t && (t.tagName === "SELECT" || t.tagName === "INPUT")) barracksUserEditing = true;
+    });
+    barracksPanel.addEventListener("pointerup", () => setTimeout(() => { barracksUserEditing = false; }, 150));
+    barracksPanel.addEventListener("click", (e) => e.stopPropagation());
+
+    function fmtMMSS(ms) {
+      const total = Math.max(0, Math.ceil(ms / 1000));
+      const m = Math.floor(total / 60);
+      const s = total % 60;
+      return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    }
+
+    function unlockedTiersForBarracksLevel(lvl) {
+      const tiers = [];
+      for (const tier of ["T1","T2","T3","T4"]) {
+        if ((BARRACKS_TIER_UNLOCK?.[tier] ?? 999) <= lvl) tiers.push(tier);
+      }
+      return tiers;
+    }
+
+    function troopOptionsForBarracksLevel(barracksLevel) {
+      const allowed = new Set(unlockedTiersForBarracksLevel(barracksLevel));
+      return Object.values(TROOPS)
+        .filter(t => allowed.has(t.tier))
+        .map(t => ({ id: t.id, label: t.label ?? t.id }));
+    }
+
+    function getBarracksLevelSafe() {
+      return Number(state?.buildings?.levels?.barracks || 0);
+    }
+
+    function findBarracksPlot(){
+      return CITY_PLOTS.find(p => buildings.getPlacedOnPlot(p.id)?.buildingId === "barracks") || null;
+    }
+
+    function normalizeSlots(snap){
+      let slots = snap?.slots ?? snap?.items ?? snap?.queue ?? snap?.queues?.barracks ?? snap?.queues;
+      if (!Array.isArray(slots)) slots = slots ? Object.values(slots).flat() : [];
+      return slots.map((s) => {
+        if (s?.active) {
+          const job = s.active;
+          const now = Date.now();
+          const totalMs = job.totalMs ?? Math.max(1, (job.endAt ?? now) - (job.startAt ?? now));
+          const remainingMs = Math.max(0, (job.endAt ?? now) - now);
+          return { status:"training", troopId:job.troopId, amount:job.amount, totalMs, remainingMs };
+        }
+        if (s?.status) return s;
+        return { status:"idle" };
+      });
+    }
+
+    function renderBarracksPanel() {
+      const barracksLevel = getBarracksLevelSafe();
+      try { syncBarracksSlots?.(barracksLevel); } catch {}
+
+      const snap = getTrainingSnapshot?.("barracks") ?? {};
+      const normalized = normalizeSlots(snap);
+      const opts = troopOptionsForBarracksLevel(barracksLevel);
+
+      const trainHtml = normalized.map((s, i) => {
+        const isIdle = s.status === "idle" || !s.troopId;
+
+        if (isIdle) {
+          const options = opts.map(o => `<option value="${o.id}">${o.label}</option>`).join("");
+          return `
+            <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <b>Slot ${i+1}</b>
+                <span style="opacity:.7">Idle</span>
+              </div>
+
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <select data-slot="${i}" data-role="troop"
+                  style="flex:1; background:#111827; color:#e5e7eb; border:1px solid rgba(255,255,255,.12);
+                  border-radius:12px; padding:10px;">
+                  ${options || `<option value="">(No troops unlocked)</option>`}
+                </select>
+
+                <input data-slot="${i}" data-role="amt" type="number" min="1" value="1"
+                  style="width:92px; background:#111827; color:#e5e7eb; border:1px solid rgba(255,255,255,.12);
+                  border-radius:12px; padding:10px;" />
+              </div>
+
+              <button data-slot="${i}" data-role="start"
+                style="margin-top:10px; width:100%; background:#2563eb; color:white; border:0;
+                border-radius:12px; padding:12px; font-weight:900; cursor:pointer;">
+                Train
+              </button>
+            </div>
+          `;
+        }
+
+        const pct = s.totalMs ? Math.min(100, Math.max(0, 100 * (1 - s.remainingMs / s.totalMs))) : 0;
+        return `
+          <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <b>Slot ${i+1}</b>
+              <span style="opacity:.9">${s.troopId} × ${s.amount}</span>
+            </div>
+
+            <div style="margin-top:10px; height:10px; background:rgba(255,255,255,.12); border-radius:999px; overflow:hidden;">
+              <div style="height:100%; width:${pct}%; background:rgba(37,99,235,.95);"></div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; margin-top:8px; opacity:.85;">
+              <span>${fmtMMSS(s.remainingMs)} left</span>
+              <span>${Math.round(pct)}%</span>
+            </div>
+
+            <button data-slot="${i}" data-role="cancel"
+              style="margin-top:10px; width:100%; background:rgba(239,68,68,.95); color:white; border:0;
+              border-radius:12px; padding:12px; font-weight:900; cursor:pointer;">
+              Cancel
+            </button>
+          </div>
+        `;
+      }).join("");
+
+      const barracksPlot = findBarracksPlot();
+      const barracksPlaced = barracksPlot ? buildings.getPlacedOnPlot(barracksPlot.id) : null;
+
+      let upgradeBlock = `<div style="opacity:.85">No barracks placed yet.</div>`;
+      if (barracksPlaced && barracksPlot) {
+        const lvl = barracksPlaced.level ?? 1;
+        const chk = buildings.canUpgradePlot(barracksPlot.id);
+        const def = BUILDINGS?.barracks;
+        const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
+        const affordable = canAfford(upgradeCost);
+        const disabled = (!chk.ok || (upgradeCost && !affordable) || !upgradeCost);
+
+        upgradeBlock = `
+          <div class="upCard">
+            <div class="upTitle">Barracks</div>
+            <div class="upRow"><span>Current Level:</span> <b>${lvl}</b></div>
+            <div class="upRow"><span>Cost:</span> <span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
+
+            <button id="bxUpgradeBtn" class="upBtn" ${disabled ? "disabled" : ""}>
+              Upgrade → Lv ${lvl+1}
+            </button>
+
+            ${(!chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
+            ${(chk.ok && upgradeCost && !affordable ? `<div class="upReason">Not enough resources</div>` : "")}
+
+            <div class="upHint">
+              Tiers unlock by Barracks level: L1=T1, L5=T2, L10=T3, L15=T4
+            </div>
+          </div>
+        `;
+      }
+
+      barracksPanel.innerHTML = `
+        <div class="bxHeader">
+          <div>
+            <div style="font-size:14px;font-weight:900;">Barracks</div>
+            <div style="opacity:.7;margin-top:2px;">L${barracksLevel}</div>
+          </div>
+          <button id="barracksCloseBtn" class="bxClose" type="button">Close</button>
+        </div>
+
+        <div class="bxWrap">
+          <div class="bxTabs">
+            <button class="bxTab ${barracksTab==="train"?"active":""}" data-tab="train" type="button">Train</button>
+            <button class="bxTab ${barracksTab==="upgrade"?"active":""}" data-tab="upgrade" type="button">Upgrade</button>
+          </div>
+
+          <div class="bxMain">
+            <div id="bxTab_train" style="display:${barracksTab==="train"?"block":"none"};">
+              ${trainHtml || `<div style="opacity:.8">No slots found.</div>`}
+              <div class="upHint">Tiers unlock: L1=T1, L5=T2, L10=T3, L15=T4</div>
+            </div>
+
+            <div id="bxTab_upgrade" style="display:${barracksTab==="upgrade"?"block":"none"};">
+              ${upgradeBlock}
+            </div>
+          </div>
+        </div>
+      `;
+
+      barracksPanel.querySelector("#barracksCloseBtn").onclick = () => { barracksPanel.style.display = "none"; };
+
+      barracksPanel.querySelectorAll(".bxTab").forEach(btn => {
+        btn.onclick = () => {
+          barracksTab = btn.getAttribute("data-tab");
+          renderBarracksPanel();
+          centerPanelOnScreen(barracksPanel);
+        };
+      });
+
+      barracksPanel.querySelectorAll("button[data-role='start']").forEach(btn => {
+        btn.onclick = () => {
+          const slotIndex = Number(btn.getAttribute("data-slot"));
+          const troopSel = barracksPanel.querySelector(`select[data-slot="${slotIndex}"][data-role="troop"]`);
+          const amtInp  = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
+          const troopId = troopSel?.value;
+          const amount = Math.max(1, Number(amtInp?.value || 1));
+          if (!troopId) return alert("No troop selected / unlocked.");
+          const res = startTrainingInSlot({ barracksLevel, slotIndex, troopId, amount });
+          if (!res?.ok) alert(res?.reason || "Could not start training.");
+          renderBarracksPanel();
+        };
+      });
+
+      barracksPanel.querySelectorAll("button[data-role='cancel']").forEach(btn => {
+        btn.onclick = () => {
+          const slotIndex = Number(btn.getAttribute("data-slot"));
+          if (!confirm("Cancel this training slot?")) return;
+          const res = cancelTraining?.({ slotIndex, refundPercent: 0.5 });
+          if (res && res.ok === false) alert(res.reason || "Could not cancel.");
+          renderBarracksPanel();
+        };
+      });
+
+      const up = barracksPanel.querySelector("#bxUpgradeBtn");
+      if (up && barracksPlot) {
+        up.onclick = async () => {
+          const r = await buildings.upgradePlot(barracksPlot.id);
+          if (r && r.ok === false) { alert(r.reason || "Upgrade failed."); return; }
+          syncLevelsFromPlaced();
+          renderBarracksPanel();
+          centerPanelOnScreen(barracksPanel);
+        };
+      }
+    }
+
+    // smooth refresh while training
+    setInterval(() => {
+      if (barracksPanel.style.display === "none") return;
+      if (barracksUserEditing) return;
+
+      const snap = getTrainingSnapshot?.("barracks") ?? {};
+      const slots = normalizeSlots(snap);
+      const anyTraining = slots.some(s => s.status === "training");
+      if (!anyTraining) return;
+
+      if (barracksRafPending) return;
+      barracksRafPending = true;
+      requestAnimationFrame(() => {
+        barracksRafPending = false;
+        renderBarracksPanel();
+        centerPanelOnScreen(barracksPanel);
+      });
+    }, 250);
+
+    // =========================================================
+    // 9) CLICK BEHAVIOR
+    // =========================================================
+    scene.setOnPlotClick((plot) => {
+      if (!plot) return;
+      if (!isRecentUserClick()) return;
+
+      const existing = buildings.getPlacedOnPlot(plot.id);
+      const isBarracks = existing?.buildingId === "barracks";
+
+      if (isBarracks) {
+        popup.style.display = "none";
+        barracksTab = "train";
+        barracksPanel.style.display = "block";
+        renderBarracksPanel();
+        centerPanelOnScreen(barracksPanel);
+        return;
+      }
+
+      barracksPanel.style.display = "none";
+      openBuildPopup(plot);
+    });
+
+    // =========================================================
+    // 10) ECONOMY + RESOURCE BAR
+    // =========================================================
     const fmt = (n) => Math.floor(n || 0).toLocaleString();
     const fmtRate = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString();
 
+    function renderResourceBar(){
+      const p = getProductionPerSecond();
+      resourceLeft.innerHTML = `
+        <div class="resItem"><b>Food</b> ${fmt(state.resources.food)} <span>(+${fmtRate(p.food)}/s)</span></div>
+        <div class="resItem"><b>Wood</b> ${fmt(state.resources.wood)} <span>(+${fmtRate(p.wood)}/s)</span></div>
+        <div class="resItem"><b>Stone</b> ${fmt(state.resources.stone)} <span>(+${fmtRate(p.stone)}/s)</span></div>
+        <div class="resItem"><b>Ore</b> ${fmt(state.resources.ore)} <span>(+${fmtRate(p.ore)}/s)</span></div>
+        <div class="resItem"><b>Gold</b> ${fmt(state.resources.gold)} <span>(+${fmtRate(p.gold)}/s)</span></div>
+        <div class="resItem" style="opacity:.9"><b>TH</b> ${state.buildings?.levels?.townhall || 0}</div>
+      `;
+    }
+
     let econLast = 0;
-    function economyFrame(t) {
+    function economyFrame(t){
       const dt = econLast ? (t - econLast) / 1000 : 0;
       econLast = t;
-
-      syncLevelsFromPlaced();
       updateEconomy(dt);
-
-      const p = getProductionPerSecond();
-      hud.innerHTML = `
-        <div><b>Food:</b> ${fmt(state.resources.food)} (+${fmtRate(p.food)}/s)</div>
-        <div><b>Wood:</b> ${fmt(state.resources.wood)} (+${fmtRate(p.wood)}/s)</div>
-        <div><b>Stone:</b> ${fmt(state.resources.stone)} (+${fmtRate(p.stone)}/s)</div>
-        <div><b>Ore:</b> ${fmt(state.resources.ore)} (+${fmtRate(p.ore)}/s)</div>
-        <div><b>Gold:</b> ${fmt(state.resources.gold)} (+${fmtRate(p.gold)}/s)</div>
-        <div style="opacity:.7;margin-top:6px">TH=${state.buildings.levels.townhall||0} • House=${state.buildings.levels.house||0}</div>
-      `;
-
+      renderResourceBar();
       requestAnimationFrame(economyFrame);
     }
     requestAnimationFrame(economyFrame);
 
-    // ===== Main loop =====
-    function frame() {
+    // =========================================================
+    // 11) SAVE / LOAD (your existing)
+    // =========================================================
+    function buildSavePayload() {
+      syncLevelsFromPlaced();
+      const placed = [];
+      for (const plot of CITY_PLOTS) {
+        const p = buildings.getPlacedOnPlot(plot.id);
+        if (!p) continue;
+        placed.push({ plotId: plot.id, buildingId: p.buildingId, level: p.level ?? 1 });
+      }
+      return {
+        v: 1,
+        ts: Date.now(),
+        resources: { ...state.resources },
+        levels: { ...state.buildings.levels },
+        placed,
+      };
+    }
+
+    function saveGame() {
+      try {
+        const payload = buildSavePayload();
+        const json = JSON.stringify(payload);
+        localStorage.setItem(SAVE_KEY, json);
+
+        const btn = document.getElementById("btnSave");
+        if (btn) {
+          const prev = btn.textContent;
+          btn.textContent = "Saved ✅";
+          setTimeout(() => (btn.textContent = prev), 900);
+        }
+        console.log("✅ Saved", { bytes: json.length, placed: payload.placed.length, ts: payload.ts });
+      } catch (e) {
+        console.error("❌ SAVE FAILED:", e);
+      }
+    }
+
+    function loadGame() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return console.warn("No save found.");
+        sessionStorage.setItem(PENDING_KEY, raw);
+        location.reload();
+      } catch (e) {
+        console.error("❌ LOAD FAILED:", e);
+      }
+    }
+
+    function resetSave() {
+      localStorage.removeItem(SAVE_KEY);
+      sessionStorage.removeItem(PENDING_KEY);
+      location.reload();
+    }
+
+    async function applyPayload(data) {
+      if (!data || typeof data !== "object") return false;
+
+      if (data.resources) {
+        state.resources.food  = Number(data.resources.food  ?? 0);
+        state.resources.wood  = Number(data.resources.wood  ?? 0);
+        state.resources.stone = Number(data.resources.stone ?? 0);
+        state.resources.ore   = Number(data.resources.ore   ?? 0);
+        state.resources.gold  = Number(data.resources.gold  ?? 0);
+      }
+
+      if (typeof buildings.resetAllPlaced === "function") buildings.resetAllPlaced();
+
+      if (Array.isArray(data.placed)) {
+        for (const rec of data.placed) {
+          const plotId = String(rec.plotId);
+          const buildingId = String(rec.buildingId);
+          const targetLevel = Math.max(1, Number(rec.level ?? 1));
+
+          await buildings.placeBuildingOnPlot(plotId, buildingId, 1);
+
+          for (let lvl = 1; lvl < targetLevel; lvl++) {
+            const r = await buildings.upgradePlot(plotId);
+            if (r && r.ok === false) break;
+          }
+        }
+      }
+
+      await buildings.ensureTownhall("townhall");
+      syncLevelsFromPlaced();
+      return true;
+    }
+
+    (async function bootLoad() {
+      const pending = sessionStorage.getItem(PENDING_KEY);
+      if (!pending) return;
+      sessionStorage.removeItem(PENDING_KEY);
+
+      try {
+        const data = JSON.parse(pending);
+        const ok = await applyPayload(data);
+        console.log(ok ? "✅ Loaded" : "❌ Load failed", data);
+      } catch (e) {
+        console.error("❌ Pending load failed:", e);
+      }
+    })();
+
+    document.getElementById("btnSave").onclick = saveGame;
+    document.getElementById("btnLoad").onclick = loadGame;
+    document.getElementById("btnReset").onclick = resetSave;
+    setInterval(() => { try { saveGame(); } catch {} }, 10000);
+
+    // =========================================================
+    // 12) MAIN LOOP
+    // =========================================================
+    function frame(){
       scene.update();
       scene.render();
+
+      processTrainingQueues();
+      updateUiOverlayRect();
+
+      if (popup.style.display !== "none") centerPanelOnScreen(popup);
+      if (barracksPanel.style.display !== "none") centerPanelOnScreen(barracksPanel);
+
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);

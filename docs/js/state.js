@@ -1,16 +1,21 @@
 ﻿// docs/js/state.js (or wherever your state.js lives)
+export const STARTING_RESOURCES = {
+  food: 500,
+  wood: 500,
+  stone: 300,
+  ore: 200,
+  gold: 250,
+};
 
 export const state = {
   selectedPlot: null,
   selectedBuilding: null,
 
   // ===== RESOURCES =====
-  resources: {
-    food: 0,
-    wood: 0,
-    stone: 0,
-    ore: 0,
-    gold: 0,
+  resources: { ...STARTING_RESOURCES },
+
+  buildings: {
+    placed: [],
   },
 
   // ===== BUILDINGS =====

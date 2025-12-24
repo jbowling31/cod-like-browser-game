@@ -4,6 +4,8 @@ import { state } from "./state.js";
 import { showPlotPopup } from "./UI/cityUI.js";
 import { createProceduralCityRenderer } from "./proceduralCityRenderer.js";
 import { updateEconomy, getProductionPerSecond } from "./systems/cityeconomy.js";
+import { processTrainingQueues } from "./js/systems/trainingsystem.js";
+
 
 
 
@@ -347,34 +349,25 @@ function fmtRate(n) {
 
 function fmt(n) { return Math.floor(n || 0).toLocaleString(); }
 
-function renderResourceHud() {
-  let hud = document.getElementById("hud");
-  if (!hud) {
-    hud = document.createElement("div");
-    hud.id = "hud";
-    hud.style.position = "fixed";
-    hud.style.left = "10px";
-    hud.style.top = "10px";
-    hud.style.zIndex = "9999";
-    hud.style.color = "#e5e7eb";
-    hud.style.background = "rgba(0,0,0,.45)";
-    hud.style.padding = "8px 10px";
-    hud.style.borderRadius = "10px";
-    hud.style.font = "12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    hud.style.pointerEvents = "none";
-    document.body.appendChild(hud);
-  }
+const resourceLeft = document.getElementById("resourceLeft");
 
-  const r = state.resources || {};
-  hud.innerHTML = `
-    <div><b>Food:</b> ${fmt(r.food)}</div>
-    <div><b>Wood:</b> ${fmt(r.wood)}</div>
-    <div><b>Stone:</b> ${fmt(r.stone)}</div>
-    <div><b>Ore:</b> ${fmt(r.ore)}</div>
-    <div><b>Gold:</b> ${fmt(r.gold)}</div>
-    <div style="opacity:.7;margin-top:6px">HUD OK ✅</div>
+function renderResourceBar(){
+  const p = getProductionPerSecond();
+  const fmt = (n) => Math.floor(n || 0).toLocaleString();
+  const fmtRate = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString();
+
+  resourceLeft.innerHTML = `
+    <span class="resItem">Food: ${fmt(state.resources.food)} <span class="resRate">(+${fmtRate(p.food)}/s)</span></span>
+    <span class="resItem">Wood: ${fmt(state.resources.wood)} <span class="resRate">(+${fmtRate(p.wood)}/s)</span></span>
+    <span class="resItem">Stone: ${fmt(state.resources.stone)} <span class="resRate">(+${fmtRate(p.stone)}/s)</span></span>
+    <span class="resItem">Ore: ${fmt(state.resources.ore)} <span class="resRate">(+${fmtRate(p.ore)}/s)</span></span>
+    <span class="resItem">Gold: ${fmt(state.resources.gold)} <span class="resRate">(+${fmtRate(p.gold)}/s)</span></span>
+    <span class="resItem" style="opacity:.75;margin-left:10px;">
+      TH=${state.buildings.levels.townhall||0}
+    </span>
   `;
 }
+
 
 
 // =========================
@@ -406,3 +399,10 @@ function syncLayerSizes() {
     cityCanvas.style.height = `${h}px`;
   }
 }
+const BUILDING_SCALES = {
+  quarry: 3.15,
+  mine: 1.1,
+  default: 0.85,
+};
+
+

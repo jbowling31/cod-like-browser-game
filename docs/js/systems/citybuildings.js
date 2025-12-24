@@ -1,6 +1,7 @@
 // docs/js/systems/cityBuildings.js
-import { BUILDINGS } from "../data/buildingcatalog.js";
+import { BUILDINGS } from "../data/buildingcatalog.js"; // ✅ correct casing
 import { loadBuildingSprite } from "./assets.js";
+import { state } from "../state.js";
 
 const MAX_LEVEL = 20;
 
@@ -28,7 +29,6 @@ function tierKeyForLevel(level) {
 export function createCityBuildingsSystem({ basePath }) {
   const placed = new Map(); // plotId -> instance
 
-  // Build placement gates (unique buildings only)
   // Building becomes placeable when Town Hall reaches this level.
   const BUILD_MIN_TOWNHALL_LEVEL = {
     farm: 1,           // needed to unlock TH2
@@ -37,8 +37,8 @@ export function createCityBuildingsSystem({ basePath }) {
     quarry: 4,         // unlock TH5
     house: 5,          // unlock TH6
     mine: 6,           // unlock TH7
-    academy: 8,        // unlock TH8
-    commandcenter: 10,  // unlock TH10
+    academy: 7,        // unlock TH8
+    commandcenter: 9,  // unlock TH10
   };
 
   // Starter draw sizes (tweak later if needed)
@@ -54,6 +54,18 @@ export function createCityBuildingsSystem({ basePath }) {
     house: { w: 48, h: 48 },
   };
 
+  // ---------- STATE LEVEL SYNC (UI reads this; keep it current) ----------
+  function writeLevelToState(buildingId, level) {
+    state.buildings ||= {};
+    state.buildings.levels ||= {};
+    state.buildings.levels[buildingId] = level;
+
+    if (buildingId === "townhall") {
+      state.buildings.townhallLevel = level;
+    }
+  }
+
+  // ---------- QUERIES ----------
   function getAllPlaced() {
     return Array.from(placed.values());
   }
@@ -68,9 +80,43 @@ export function createCityBuildingsSystem({ basePath }) {
 
   function getTownhallLevel() {
     const th = getByBuildingId("townhall");
-    return th ? th.level : 0;
+    return th ? (th.level || 1) : 0;
   }
 
+  // ---------- COST HELPERS (authoritative gameplay rules live here) ----------
+  function isResourceUnlocked(res) {
+    // IMPORTANT: do NOT use state.buildings.placed (you don’t maintain it)
+    // Use the real placed Map via getByBuildingId().
+    if (res === "stone") return !!getByBuildingId("quarry");
+    if (res === "ore") return !!getByBuildingId("mine");
+    return true;
+  }
+
+  function canAfford(cost) {
+    if (!cost) return true;
+
+    for (const k in cost) {
+      const need = Number(cost[k] ?? 0);
+
+      // ✅ key fix: zero-cost keys must NOT gate anything
+      if (need <= 0) continue;
+
+      if (!isResourceUnlocked(k)) return false;
+      if ((state.resources?.[k] ?? 0) < need) return false;
+    }
+    return true;
+  }
+
+  function spend(cost) {
+    if (!cost) return;
+    for (const k in cost) {
+      const need = Number(cost[k] ?? 0);
+      if (need <= 0) continue; // keep this consistent with canAfford
+      state.resources[k] = (state.resources?.[k] ?? 0) - need;
+    }
+  }
+
+  // ---------- BUILD GATING ----------
   function canBuildBuilding(buildingId) {
     if (buildingId === "townhall") {
       return { ok: false, reason: "Town Hall is already placed." };
@@ -104,9 +150,26 @@ export function createCityBuildingsSystem({ basePath }) {
     inst.img = sprite.img;
   }
 
-  async function placeBuildingOnPlot(plotId, buildingId, level = 1) {
+  async function placeBuildingOnPlot(plotId, buildingId, level = 1, { free = false } = {}) {
     const def = BUILDINGS[buildingId];
-    if (!def) throw new Error(`Unknown building: ${buildingId}`);
+    if (!def) return { ok: false, reason: "Unknown building" };
+
+    // Enforce unique + TH gating for non-townhall
+    if (buildingId !== "townhall") {
+      const gate = canBuildBuilding(buildingId);
+      if (!gate.ok) return gate;
+    }
+
+    // Plot already occupied?
+    if (placed.has(plotId)) {
+      return { ok: false, reason: "Plot already occupied." };
+    }
+
+    // COST CHECK + SPEND (unless free)
+    if (!free && def.cost) {
+      if (!canAfford(def.cost)) return { ok: false, reason: "Not enough resources" };
+      spend(def.cost);
+    }
 
     const sz = SIZE[buildingId] || { w: 48, h: 48 };
 
@@ -123,30 +186,27 @@ export function createCityBuildingsSystem({ basePath }) {
 
     await refreshSprite(inst);
     placed.set(plotId, inst);
-    return inst;
+
+    // ✅ keep UI-consumed levels in sync immediately
+    writeLevelToState(buildingId, inst.level);
+
+    return { ok: true, inst };
   }
 
   async function ensureTownhall(plotId = "townhall") {
     // If a townhall exists anywhere, do nothing
-    if (getByBuildingId("townhall")) return;
-    await placeBuildingOnPlot(plotId, "townhall", 1);
+    if (getByBuildingId("townhall")) return { ok: true };
+
+    // Townhall should be free when seeding
+    return await placeBuildingOnPlot(plotId, "townhall", 1, { free: true });
   }
 
   // ---------- UPGRADE RULES ----------
-  // Other buildings:
-  // - cannot be upgraded unless Town Hall level is STRICTLY higher than the building's current level.
-  // Town Hall:
-  // - cannot upgrade to next level until:
-  //   (a) any required building for that target level exists (TOWNHALL_UNLOCKS)
-  //   (b) every other placed building is at least the CURRENT Town Hall level
-
   function canUpgradePlot(plotId) {
     const b = getPlacedOnPlot(plotId);
     if (!b) return { ok: false, reason: "No building on this plot." };
 
-    // Back-compat safety
     if (typeof b.level !== "number") b.level = 1;
-
     if (b.level >= MAX_LEVEL) return { ok: false, reason: "Max level reached." };
 
     const thLevel = getTownhallLevel();
@@ -167,7 +227,7 @@ export function createCityBuildingsSystem({ basePath }) {
     if (req) {
       const reqBuilt = getByBuildingId(req);
       if (!reqBuilt) {
-        return { ok: false, reason: `Build ${BUILDINGS[req].name} to unlock Town Hall level ${nextLevel}.` };
+        return { ok: false, reason: `Build ${BUILDINGS[req]?.name || req} to unlock Town Hall level ${nextLevel}.` };
       }
     }
 
@@ -190,10 +250,71 @@ export function createCityBuildingsSystem({ basePath }) {
     if (!chk.ok) return chk;
 
     const b = getPlacedOnPlot(plotId);
+    if (!b) return { ok: false, reason: "No building on this plot." };
+
+    const def = BUILDINGS[b.buildingId];
+
+    // COST CHECK + SPEND
+    const cost = def?.upgradeCost ? def.upgradeCost(b.level ?? 1) : null;
+    if (cost && !canAfford(cost)) return { ok: false, reason: "Not enough resources" };
+    if (cost) spend(cost);
+
+    // ✅ bump immediately so UI can reflect instantly
     b.level = Math.min(MAX_LEVEL, (b.level || 1) + 1);
+
+    // ✅ sync levels used by UI
+    writeLevelToState(b.buildingId, b.level);
+
+    // sprite can load async; level should already be correct
     await refreshSprite(b);
 
-    return { ok: true, reason: "" };
+    return { ok: true, level: b.level, reason: "" };
+  }
+
+  // ---------- SAVE/LOAD HELPERS ----------
+  function exportState() {
+    return {
+      placed: Array.from(placed.values()).map((p) => ({
+        plotId: p.plotId,
+        buildingId: p.buildingId,
+        level: p.level ?? 1,
+      })),
+    };
+  }
+
+  function resetAllPlaced() {
+    placed.clear();
+  }
+
+  async function importState(data) {
+    resetAllPlaced();
+
+    const arr = Array.isArray(data?.placed) ? data.placed : [];
+    for (const rec of arr) {
+      const plotId = String(rec.plotId);
+      const buildingId = String(rec.buildingId);
+      const lvl = Math.max(1, Number(rec.level ?? 1));
+
+      // Place at level 1 (free), then upgrade up to target (free)
+      await placeBuildingOnPlot(plotId, buildingId, 1, { free: true });
+
+      for (let i = 1; i < lvl; i++) {
+        const inst = getPlacedOnPlot(plotId);
+        if (!inst) break;
+
+        inst.level = Math.min(MAX_LEVEL, inst.level + 1);
+        writeLevelToState(inst.buildingId, inst.level); // ✅ keep synced during load
+        await refreshSprite(inst);
+      }
+    }
+
+    // safety: ensure TH exists (free)
+    await ensureTownhall("townhall");
+
+    // final safety: ensure state levels reflect placed map
+    for (const inst of placed.values()) {
+      writeLevelToState(inst.buildingId, inst.level ?? 1);
+    }
   }
 
   return {
@@ -205,6 +326,7 @@ export function createCityBuildingsSystem({ basePath }) {
     getPlacedOnPlot,
     getAllPlaced,
     getTownhallLevel,
+    getByBuildingId,
 
     // build gating
     canBuildBuilding,
@@ -212,5 +334,17 @@ export function createCityBuildingsSystem({ basePath }) {
     // upgrades
     canUpgradePlot,
     upgradePlot,
+
+    // sprite loading
+    refreshSprite,
+
+    // save/load
+    exportState,
+    importState,
+    resetAllPlaced,
+
+    // cost helpers (exposed)
+    canAfford,
+    spend,
   };
 }
