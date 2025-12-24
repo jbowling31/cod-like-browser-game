@@ -26,7 +26,7 @@ function tierKeyForLevel(level) {
   return "L1";
 }
 
-export function createcitybuildingsSystem({ basePath }) {
+export function createCityBuildingsSystem({ basePath }) {
   const placed = new Map(); // plotId -> instance
 
   // Building becomes placeable when Town Hall reaches this level.
