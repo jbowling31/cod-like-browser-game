@@ -522,7 +522,7 @@ function isRecentUserClick() {
     }
 
     function openBuildPopup(plot){
-      if (!userInteracted) return;
+     
 
       const existing = buildings.getPlacedOnPlot(plot.id);
       buildGrid.innerHTML = "";
@@ -883,7 +883,7 @@ function isRecentUserClick() {
     // =========================================================
     scene.setOnPlotClick((plot) => {
       if (!plot) return;
-      if (!isRecentUserClick()) return;
+      
 
       const existing = buildings.getPlacedOnPlot(plot.id);
       const isBarracks = existing?.buildingId === "barracks";
@@ -900,6 +900,11 @@ function isRecentUserClick() {
       barracksPanel.style.display = "none";
       openBuildPopup(plot);
     });
+scene.setOnPlotClick((plot) => {
+  console.log("plot click", plot?.id, Date.now() - lastUserPointerAt, userInteracted);
+  
+
+});
 
     // =========================================================
     // 10) ECONOMY + RESOURCE BAR
