@@ -355,16 +355,27 @@
       return Math.max(a, Math.min(b, v));
     };
 
-    // ? REAL user interaction gate
-    let userInteracted = false;
-    canvas.addEventListener("pointerdown", () => { userInteracted = true; }, { passive:true });
+// ✅ REAL user interaction gate (works on iOS Safari)
+let userInteracted = false;
+let lastUserPointerAt = 0;
 
-    let lastUserPointerAt = 0;
-    canvas.addEventListener("pointerdown", () => { lastUserPointerAt = Date.now(); }, { passive:true });
+function markUserInteraction() {
+  userInteracted = true;
+  lastUserPointerAt = Date.now();
+}
 
-    function isRecentUserClick(){
-      return (Date.now() - lastUserPointerAt) < 800;
-    }
+// Pointer Events (modern), Touch Events (iOS quirks), Mouse (desktop)
+canvas.addEventListener("pointerdown", markUserInteraction, { passive: true });
+canvas.addEventListener("touchstart", markUserInteraction, { passive: true });
+canvas.addEventListener("mousedown", markUserInteraction, { passive: true });
+
+// Optional: some engines fire click without pointerdown/touchstart in edge cases
+canvas.addEventListener("click", markUserInteraction, { passive: true });
+
+function isRecentUserClick() {
+  return (Date.now() - lastUserPointerAt) < 1200; // slightly more forgiving on mobile
+}
+
 
     function getMapSizeSafe(){
       const w = (typeof scene.getMapWidth === "function") ? scene.getMapWidth() : 512;
