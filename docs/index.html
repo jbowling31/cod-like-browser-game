@@ -397,6 +397,35 @@
     const uiOverlay = document.getElementById("uiOverlay");
     const resourceBar = document.getElementById("resourceBar");
     const resourceLeft = document.getElementById("resourceLeft");
+// ==== iOS Safari: prevent canvas touch handlers from eating UI taps ====
+function shieldUiFromCanvas(uiRoot) {
+  if (!uiRoot) return;
+
+  const shield = (e) => {
+    const isUi = e.target?.closest?.("#resourceBar, .uiPanel");
+    if (!isUi) return;
+    e.stopPropagation();
+  };
+
+  // Capture phase: intercept before canvas listeners
+  [
+    "touchstart",
+    "touchmove",
+    "touchend",
+    "touchcancel",
+    "pointerdown",
+    "pointermove",
+    "pointerup",
+    "click"
+  ].forEach((type) => {
+    uiRoot.addEventListener(type, shield, {
+      capture: true,
+      passive: true,
+    });
+  });
+}
+
+shieldUiFromCanvas(uiOverlay);
 
     const clamp = (v, a, b) => {
       v = Number(v);
@@ -524,8 +553,12 @@
     const buildGrid = document.getElementById("buildGrid");
     const buildClose = document.getElementById("buildClose");
 
-    buildClose.onclick = () => { popup.style.display = "none"; };
-    popup.style.display = "none";
+   buildClose.addEventListener("pointerup", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  popup.style.display = "none";
+});
+;
 
     function syncLevelsFromPlaced() {
       const lv = (state.buildings.levels ||= {});
@@ -589,16 +622,16 @@
 
         const upBtn = buildGrid.querySelector("#btnUpgrade");
         if (upBtn && !upBtn.disabled) {
-          upBtn.onclick = async () => {
-            const res = await buildings.upgradePlot(plot.id);
-            if (!res?.ok) {
-              alert(res?.reason || "Upgrade failed");
-              return;
-            }
-            syncLevelsFromPlaced();
-            openBuildPopup(plot);
-            centerPanelOnScreen(popup);
-          };
+          btn.addEventListener("pointerup", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
+  if (r && r.ok === false) alert(r.reason || "Could not build.");
+  syncLevelsFromPlaced();
+  popup.style.display = "none";
+});
+
         }
 
         popup.style.display = "block";
@@ -626,12 +659,16 @@
           btn.style.opacity = "0.35";
           btn.title = "Not enough resources";
         } else {
-          btn.onclick = async () => {
-            const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
-            if (r && r.ok === false) alert(r.reason || "Could not build.");
-            syncLevelsFromPlaced();
-            popup.style.display = "none";
-          };
+          btn.addEventListener("pointerup", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
+  if (r && r.ok === false) alert(r.reason || "Could not build.");
+  syncLevelsFromPlaced();
+  popup.style.display = "none";
+});
+
         }
 
         buildGrid.appendChild(btn);
@@ -894,6 +931,27 @@
         centerPanelOnScreen(barracksPanel);
       });
     }, 250);
+function lockUiPanelInput(panel) {
+  if (!panel) return;
+
+  // Prevent taps inside panels from falling through to canvas
+  const stop = (e) => {
+    e.stopPropagation();
+  };
+
+  panel.addEventListener("pointerdown", stop);
+  panel.addEventListener("pointerup", stop);
+  panel.addEventListener("click", stop);
+
+  // iOS: ensure touches don't get interpreted as scrolling/zooming gestures
+  panel.addEventListener("touchstart", stop, { passive: true });
+  panel.addEventListener("touchend", stop, { passive: true });
+
+  panel.style.touchAction = "manipulation";
+}
+
+lockUiPanelInput(popup);
+lockUiPanelInput(barracksPanel);
 
     // =========================================================
     // 10) CLICK BEHAVIOR (NO "RECENT CLICK" GATE)
@@ -1062,8 +1120,34 @@
       processTrainingQueues();
       updateUiOverlayRect();
 
+        window.addEventListener("resize", () => {
+      updateUiOverlayRect();
       if (popup.style.display !== "none") centerPanelOnScreen(popup);
       if (barracksPanel.style.display !== "none") centerPanelOnScreen(barracksPanel);
+    });
+
+      function makePanelInteractive(panel) {
+        if (!panel) return;
+
+        // iOS: ensure taps are treated as taps
+        panel.style.touchAction = "manipulation";
+        panel.style.pointerEvents = "auto";
+
+        // Stop events from reaching the canvas/scene handlers
+        const stop = (e) => {
+          e.stopPropagation();
+        };
+
+        panel.addEventListener("pointerdown", stop, { passive: true });
+        panel.addEventListener("pointerup", stop, { passive: true });
+        panel.addEventListener("click", stop);
+
+        panel.addEventListener("touchstart", stop, { passive: true });
+        panel.addEventListener("touchend", stop, { passive: true });
+      }
+
+      makePanelInteractive(popup);
+      makePanelInteractive(barracksPanel);
 
       requestAnimationFrame(frame);
     }
