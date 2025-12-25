@@ -1,5 +1,4 @@
-﻿<!-- index.html -->
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -27,7 +26,7 @@
       z-index:1000;
     }
 
-    /* ============== RESOURCE BAR (bigger + cooler) ============== */
+    /* ============== RESOURCE BAR ============== */
     #resourceBar{
       position:absolute;
       left:0; top:0; right:0;
@@ -85,6 +84,7 @@
       cursor:pointer;
       font:13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
       transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+      touch-action: manipulation;
     }
 
     #resourceRight button:hover{
@@ -116,7 +116,12 @@
       -webkit-backdrop-filter: blur(10px);
       pointer-events:auto;
       box-shadow: 0 14px 40px rgba(0,0,0,.45);
+      touch-action: manipulation;
     }
+
+    /* Ensure children receive taps */
+    .uiPanel, .uiPanel * { pointer-events: auto; }
+    .uiPanel button, .uiPanel select, .uiPanel input { touch-action: manipulation; }
 
     /* build popup */
     #buildPopup{ display:none; }
@@ -134,6 +139,7 @@
       white-space:pre-line;
       transition: background 120ms ease, transform 120ms ease;
       width:100%;
+      touch-action: manipulation;
     }
 
     .buildBtn:hover{ background:rgba(255,255,255,.16); transform: translateY(-1px); }
@@ -147,16 +153,12 @@
       background:rgba(255,255,255,.10);
       color:#fff;
       cursor:pointer;
+      touch-action: manipulation;
     }
     .closeBtn:hover{ background:rgba(255,255,255,.16); }
 
     /* barracks panel */
     #barracksPanel{ display:none; width:420px; max-height:70vh; overflow:auto; }
-    #barracksPanel select,
-    #barracksPanel input{
-      pointer-events:auto;
-      touch-action: manipulation;
-    }
 
     /* ===== Upgrade Card (universal) ===== */
     .upCard{
@@ -209,6 +211,7 @@
       background: #22c55e;
       color: #06210f;
       box-shadow: 0 12px 26px rgba(34,197,94,.25);
+      touch-action: manipulation;
     }
 
     .upBtn:hover{ filter: brightness(1.05); }
@@ -231,7 +234,7 @@
       background: rgba(0,0,0,.35);
     }
 
-    /* ===== Barracks panel tabs (Train / Upgrade) ===== */
+    /* ===== Barracks panel tabs ===== */
     .bxHeader{
       display:flex;
       align-items:center;
@@ -246,6 +249,7 @@
       background:rgba(255,255,255,.10);
       color:#fff;
       cursor:pointer;
+      touch-action: manipulation;
     }
     .bxClose:hover{ background:rgba(255,255,255,.16); }
 
@@ -268,6 +272,7 @@
       color:#e5e7eb;
       cursor:pointer;
       font-weight:900;
+      touch-action: manipulation;
     }
     .bxTab:hover{ background:rgba(255,255,255,.10); }
     .bxTab.active{
@@ -318,7 +323,12 @@
     import { state } from "./js/state.js";
     import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
     import { processTrainingQueues } from "./js/systems/trainingsystems.js";
-    import { getTrainingSnapshot, startTrainingInSlot, cancelTraining, syncBarracksSlots } from "./js/systems/trainingsystems.js";
+    import {
+      getTrainingSnapshot,
+      startTrainingInSlot,
+      cancelTraining,
+      syncBarracksSlots
+    } from "./js/systems/trainingsystems.js";
     import { TROOPS, BARRACKS_TIER_UNLOCK } from "./js/data/troopsCatalog.js";
 
     // =========================================================
@@ -330,58 +340,9 @@
     const PENDING_KEY = "EMPIRE_PENDING_LOAD";
 
     // =========================================================
-    // 3) CANVAS + iOS SAFARI TOUCH->POINTER BRIDGE
+    // 3) BOOT SCENE + SYSTEMS
     // =========================================================
     const canvas = document.getElementById("cityCanvas");
-
-    (function enableIosTouchPointerBridge(canvasEl) {
-      if (!canvasEl) return;
-      const supportsPointer = "PointerEvent" in window;
-      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      if (!isIos || !supportsPointer) return;
-
-      const makePtr = (type, t) =>
-        new PointerEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          pointerId: 1,
-          pointerType: "touch",
-          isPrimary: true,
-          clientX: t.clientX,
-          clientY: t.clientY,
-          screenX: t.screenX,
-          screenY: t.screenY,
-          buttons: type === "pointerup" ? 0 : 1,
-        });
-
-      canvasEl.addEventListener("touchstart", (e) => {
-        if (!e.changedTouches?.length) return;
-        const t = e.changedTouches[0];
-        canvasEl.dispatchEvent(makePtr("pointerdown", t));
-      }, { passive: true });
-
-      canvasEl.addEventListener("touchmove", (e) => {
-        if (!e.changedTouches?.length) return;
-        const t = e.changedTouches[0];
-        canvasEl.dispatchEvent(makePtr("pointermove", t));
-      }, { passive: true });
-
-      canvasEl.addEventListener("touchend", (e) => {
-        if (!e.changedTouches?.length) return;
-        const t = e.changedTouches[0];
-        canvasEl.dispatchEvent(makePtr("pointerup", t));
-      }, { passive: true });
-
-      canvasEl.addEventListener("touchcancel", (e) => {
-        if (!e.changedTouches?.length) return;
-        const t = e.changedTouches[0];
-        canvasEl.dispatchEvent(makePtr("pointercancel", t));
-      }, { passive: true });
-    })(canvas);
-
-    // =========================================================
-    // 4) BOOT SCENE + SYSTEMS
-    // =========================================================
     const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC });
     scene.setPlots(CITY_PLOTS);
 
@@ -392,40 +353,11 @@
     if (!hasPendingLoad) await buildings.ensureTownhall("townhall");
 
     // =========================================================
-    // 5) UI OVERLAY RECT (map -> css px)
+    // 4) UI OVERLAY RECT (map -> css px)
     // =========================================================
     const uiOverlay = document.getElementById("uiOverlay");
     const resourceBar = document.getElementById("resourceBar");
     const resourceLeft = document.getElementById("resourceLeft");
-// ==== iOS Safari: prevent canvas touch handlers from eating UI taps ====
-function shieldUiFromCanvas(uiRoot) {
-  if (!uiRoot) return;
-
-  const shield = (e) => {
-    const isUi = e.target?.closest?.("#resourceBar, .uiPanel");
-    if (!isUi) return;
-    e.stopPropagation();
-  };
-
-  // Capture phase: intercept before canvas listeners
-  [
-    "touchstart",
-    "touchmove",
-    "touchend",
-    "touchcancel",
-    "pointerdown",
-    "pointermove",
-    "pointerup",
-    "click"
-  ].forEach((type) => {
-    uiRoot.addEventListener(type, shield, {
-      capture: true,
-      passive: true,
-    });
-  });
-}
-
-shieldUiFromCanvas(uiOverlay);
 
     const clamp = (v, a, b) => {
       v = Number(v);
@@ -448,7 +380,7 @@ shieldUiFromCanvas(uiOverlay);
       const r = canvas.getBoundingClientRect();
       return {
         x: r.left + (canvasPxX / canvas.width) * r.width,
-        y: r.top + (canvasPxY / canvas.height) * r.height,
+        y: r.top + (canvasPxY / canvas.height) * r.height
       };
     }
 
@@ -471,7 +403,34 @@ shieldUiFromCanvas(uiOverlay);
     }
 
     // =========================================================
-    // 6) PLACEMENT HELPERS (CENTERED PANELS)
+    // 5) iOS SAFARI: UI EVENT SHIELD (BUBBLE PHASE)
+    // =========================================================
+    function shieldUiFromCanvas(uiRoot) {
+      if (!uiRoot) return;
+
+      const isUiTarget = (e) => !!e.target?.closest?.("#resourceBar, .uiPanel");
+
+      const stopBubble = (e) => {
+        if (!isUiTarget(e)) return;
+        e.stopPropagation();
+      };
+
+      const stopUiScroll = (e) => {
+        if (!isUiTarget(e)) return;
+        e.preventDefault();
+      };
+
+      ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach((type) => {
+        uiRoot.addEventListener(type, stopBubble);
+      });
+
+      uiRoot.addEventListener("touchmove", stopUiScroll, { passive: false });
+    }
+
+    shieldUiFromCanvas(uiOverlay);
+
+    // =========================================================
+    // 6) PLACEMENT HELPERS (CENTER PANELS ON SCREEN)
     // =========================================================
     function centerPanelOnScreen(panelEl) {
       const r = canvas.getBoundingClientRect();
@@ -504,7 +463,23 @@ shieldUiFromCanvas(uiOverlay);
     }
 
     // =========================================================
-    // 7) COST HELPERS
+    // 7) TAP BINDER (iOS-safe)
+    // =========================================================
+    function bindTap(el, fn) {
+      if (!el) return;
+
+      const run = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await fn(e);
+      };
+
+      el.addEventListener("pointerup", run, { passive: false });
+      el.addEventListener("touchend", run, { passive: false });
+    }
+
+    // =========================================================
+    // 8) COST HELPERS
     // =========================================================
     function fmtCost(cost) {
       if (!cost) return "";
@@ -546,19 +521,15 @@ shieldUiFromCanvas(uiOverlay);
     }
 
     // =========================================================
-    // 8) BUILD POPUP (NO "USER INTERACTED" GATE)
+    // 9) BUILD POPUP
     // =========================================================
     const popup = document.getElementById("buildPopup");
     const buildTitle = document.getElementById("buildTitle");
     const buildGrid = document.getElementById("buildGrid");
     const buildClose = document.getElementById("buildClose");
 
-   buildClose.addEventListener("pointerup", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  popup.style.display = "none";
-});
-;
+    bindTap(buildClose, async () => { popup.style.display = "none"; });
+    popup.style.display = "none";
 
     function syncLevelsFromPlaced() {
       const lv = (state.buildings.levels ||= {});
@@ -622,16 +593,16 @@ shieldUiFromCanvas(uiOverlay);
 
         const upBtn = buildGrid.querySelector("#btnUpgrade");
         if (upBtn && !upBtn.disabled) {
-          btn.addEventListener("pointerup", async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
-  if (r && r.ok === false) alert(r.reason || "Could not build.");
-  syncLevelsFromPlaced();
-  popup.style.display = "none";
-});
-
+          bindTap(upBtn, async () => {
+            const res = await buildings.upgradePlot(plot.id);
+            if (!res?.ok) {
+              alert(res?.reason || "Upgrade failed");
+              return;
+            }
+            syncLevelsFromPlaced();
+            openBuildPopup(plot);
+            centerPanelOnScreen(popup);
+          });
         }
 
         popup.style.display = "block";
@@ -646,6 +617,7 @@ shieldUiFromCanvas(uiOverlay);
 
         const btn = document.createElement("button");
         btn.className = "buildBtn";
+        btn.type = "button";
         btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCost(cost)}` : ""}`;
 
         const gate = buildings.canBuildBuilding?.(bKey) ?? { ok: true };
@@ -659,16 +631,12 @@ shieldUiFromCanvas(uiOverlay);
           btn.style.opacity = "0.35";
           btn.title = "Not enough resources";
         } else {
-          btn.addEventListener("pointerup", async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
-  if (r && r.ok === false) alert(r.reason || "Could not build.");
-  syncLevelsFromPlaced();
-  popup.style.display = "none";
-});
-
+          bindTap(btn, async () => {
+            const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
+            if (r && r.ok === false) alert(r.reason || "Could not build.");
+            syncLevelsFromPlaced();
+            popup.style.display = "none";
+          });
         }
 
         buildGrid.appendChild(btn);
@@ -679,32 +647,24 @@ shieldUiFromCanvas(uiOverlay);
     }
 
     // =========================================================
-    // 9) BARRACKS PANEL
+    // 10) BARRACKS PANEL
     // =========================================================
     const barracksPanel = document.getElementById("barracksPanel");
     barracksPanel.style.display = "none";
 
-    let barracksUserEditing = false;
     let barracksTab = "train";
     let barracksRafPending = false;
-
-    barracksPanel.addEventListener("pointerdown", (e) => {
-      const t = e.target;
-      if (t && (t.tagName === "SELECT" || t.tagName === "INPUT")) barracksUserEditing = true;
-    });
-    barracksPanel.addEventListener("pointerup", () => setTimeout(() => { barracksUserEditing = false; }, 150));
-    barracksPanel.addEventListener("click", (e) => e.stopPropagation());
 
     function fmtMMSS(ms) {
       const total = Math.max(0, Math.ceil(ms / 1000));
       const m = Math.floor(total / 60);
       const s = total % 60;
-      return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
     }
 
     function unlockedTiersForBarracksLevel(lvl) {
       const tiers = [];
-      for (const tier of ["T1", "T2", "T3", "T4"]) {
+      for (const tier of ["T1","T2","T3","T4"]) {
         if ((BARRACKS_TIER_UNLOCK?.[tier] ?? 999) <= lvl) tiers.push(tier);
       }
       return tiers;
@@ -734,10 +694,10 @@ shieldUiFromCanvas(uiOverlay);
           const now = Date.now();
           const totalMs = job.totalMs ?? Math.max(1, (job.endAt ?? now) - (job.startAt ?? now));
           const remainingMs = Math.max(0, (job.endAt ?? now) - now);
-          return { status: "training", troopId: job.troopId, amount: job.amount, totalMs, remainingMs };
+          return { status:"training", troopId:job.troopId, amount:job.amount, totalMs, remainingMs };
         }
         if (s?.status) return s;
-        return { status: "idle" };
+        return { status:"idle" };
       });
     }
 
@@ -757,7 +717,7 @@ shieldUiFromCanvas(uiOverlay);
           return `
             <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <b>Slot ${i + 1}</b>
+                <b>Slot ${i+1}</b>
                 <span style="opacity:.7">Idle</span>
               </div>
 
@@ -775,7 +735,7 @@ shieldUiFromCanvas(uiOverlay);
 
               <button data-slot="${i}" data-role="start"
                 style="margin-top:10px; width:100%; background:#2563eb; color:white; border:0;
-                border-radius:12px; padding:12px; font-weight:900; cursor:pointer;">
+                border-radius:12px; padding:12px; font-weight:900; cursor:pointer; touch-action:manipulation;">
                 Train
               </button>
             </div>
@@ -786,7 +746,7 @@ shieldUiFromCanvas(uiOverlay);
         return `
           <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <b>Slot ${i + 1}</b>
+              <b>Slot ${i+1}</b>
               <span style="opacity:.9">${s.troopId} × ${s.amount}</span>
             </div>
 
@@ -801,7 +761,7 @@ shieldUiFromCanvas(uiOverlay);
 
             <button data-slot="${i}" data-role="cancel"
               style="margin-top:10px; width:100%; background:rgba(239,68,68,.95); color:white; border:0;
-              border-radius:12px; padding:12px; font-weight:900; cursor:pointer;">
+              border-radius:12px; padding:12px; font-weight:900; cursor:pointer; touch-action:manipulation;">
               Cancel
             </button>
           </div>
@@ -827,7 +787,7 @@ shieldUiFromCanvas(uiOverlay);
             <div class="upRow"><span>Cost:</span> <span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
 
             <button id="bxUpgradeBtn" class="upBtn" ${disabled ? "disabled" : ""}>
-              Upgrade → Lv ${lvl + 1}
+              Upgrade → Lv ${lvl+1}
             </button>
 
             ${(!chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
@@ -851,72 +811,75 @@ shieldUiFromCanvas(uiOverlay);
 
         <div class="bxWrap">
           <div class="bxTabs">
-            <button class="bxTab ${barracksTab === "train" ? "active" : ""}" data-tab="train" type="button">Train</button>
-            <button class="bxTab ${barracksTab === "upgrade" ? "active" : ""}" data-tab="upgrade" type="button">Upgrade</button>
+            <button class="bxTab ${barracksTab==="train"?"active":""}" data-tab="train" type="button">Train</button>
+            <button class="bxTab ${barracksTab==="upgrade"?"active":""}" data-tab="upgrade" type="button">Upgrade</button>
           </div>
 
           <div class="bxMain">
-            <div id="bxTab_train" style="display:${barracksTab === "train" ? "block" : "none"};">
+            <div id="bxTab_train" style="display:${barracksTab==="train"?"block":"none"};">
               ${trainHtml || `<div style="opacity:.8">No slots found.</div>`}
               <div class="upHint">Tiers unlock: L1=T1, L5=T2, L10=T3, L15=T4</div>
             </div>
 
-            <div id="bxTab_upgrade" style="display:${barracksTab === "upgrade" ? "block" : "none"};">
+            <div id="bxTab_upgrade" style="display:${barracksTab==="upgrade"?"block":"none"};">
               ${upgradeBlock}
             </div>
           </div>
         </div>
       `;
 
-      barracksPanel.querySelector("#barracksCloseBtn").onclick = () => { barracksPanel.style.display = "none"; };
+      const closeBtn = barracksPanel.querySelector("#barracksCloseBtn");
+      bindTap(closeBtn, async () => { barracksPanel.style.display = "none"; });
 
       barracksPanel.querySelectorAll(".bxTab").forEach(btn => {
-        btn.onclick = () => {
+        bindTap(btn, async () => {
           barracksTab = btn.getAttribute("data-tab");
           renderBarracksPanel();
           centerPanelOnScreen(barracksPanel);
-        };
+        });
       });
 
       barracksPanel.querySelectorAll("button[data-role='start']").forEach(btn => {
-        btn.onclick = () => {
+        bindTap(btn, async () => {
           const slotIndex = Number(btn.getAttribute("data-slot"));
           const troopSel = barracksPanel.querySelector(`select[data-slot="${slotIndex}"][data-role="troop"]`);
-          const amtInp = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
+          const amtInp  = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
           const troopId = troopSel?.value;
           const amount = Math.max(1, Number(amtInp?.value || 1));
           if (!troopId) return alert("No troop selected / unlocked.");
           const res = startTrainingInSlot({ barracksLevel, slotIndex, troopId, amount });
           if (!res?.ok) alert(res?.reason || "Could not start training.");
           renderBarracksPanel();
-        };
+          centerPanelOnScreen(barracksPanel);
+        });
       });
 
       barracksPanel.querySelectorAll("button[data-role='cancel']").forEach(btn => {
-        btn.onclick = () => {
+        bindTap(btn, async () => {
           const slotIndex = Number(btn.getAttribute("data-slot"));
           if (!confirm("Cancel this training slot?")) return;
           const res = cancelTraining?.({ slotIndex, refundPercent: 0.5 });
           if (res && res.ok === false) alert(res.reason || "Could not cancel.");
           renderBarracksPanel();
-        };
+          centerPanelOnScreen(barracksPanel);
+        });
       });
 
       const up = barracksPanel.querySelector("#bxUpgradeBtn");
-      if (up && barracksPlot) {
-        up.onclick = async () => {
+      if (up && barracksPlot && !up.disabled) {
+        bindTap(up, async () => {
           const r = await buildings.upgradePlot(barracksPlot.id);
           if (r && r.ok === false) { alert(r.reason || "Upgrade failed."); return; }
           syncLevelsFromPlaced();
           renderBarracksPanel();
           centerPanelOnScreen(barracksPanel);
-        };
+        });
       }
     }
 
+    // smooth refresh while training
     setInterval(() => {
       if (barracksPanel.style.display === "none") return;
-      if (barracksUserEditing) return;
 
       const snap = getTrainingSnapshot?.("barracks") ?? {};
       const slots = normalizeSlots(snap);
@@ -931,30 +894,9 @@ shieldUiFromCanvas(uiOverlay);
         centerPanelOnScreen(barracksPanel);
       });
     }, 250);
-function lockUiPanelInput(panel) {
-  if (!panel) return;
-
-  // Prevent taps inside panels from falling through to canvas
-  const stop = (e) => {
-    e.stopPropagation();
-  };
-
-  panel.addEventListener("pointerdown", stop);
-  panel.addEventListener("pointerup", stop);
-  panel.addEventListener("click", stop);
-
-  // iOS: ensure touches don't get interpreted as scrolling/zooming gestures
-  panel.addEventListener("touchstart", stop, { passive: true });
-  panel.addEventListener("touchend", stop, { passive: true });
-
-  panel.style.touchAction = "manipulation";
-}
-
-lockUiPanelInput(popup);
-lockUiPanelInput(barracksPanel);
 
     // =========================================================
-    // 10) CLICK BEHAVIOR (NO "RECENT CLICK" GATE)
+    // 11) CLICK BEHAVIOR
     // =========================================================
     scene.setOnPlotClick((plot) => {
       if (!plot) return;
@@ -976,7 +918,7 @@ lockUiPanelInput(barracksPanel);
     });
 
     // =========================================================
-    // 11) ECONOMY + RESOURCE BAR
+    // 12) ECONOMY + RESOURCE BAR
     // =========================================================
     const fmt = (n) => Math.floor(n || 0).toLocaleString();
     const fmtRate = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString();
@@ -1004,7 +946,7 @@ lockUiPanelInput(barracksPanel);
     requestAnimationFrame(economyFrame);
 
     // =========================================================
-    // 12) SAVE / LOAD
+    // 13) SAVE / LOAD
     // =========================================================
     function buildSavePayload() {
       syncLevelsFromPlaced();
@@ -1035,9 +977,8 @@ lockUiPanelInput(barracksPanel);
           btn.textContent = "Saved ✓";
           setTimeout(() => (btn.textContent = prev), 900);
         }
-        console.log("✓ Saved", { bytes: json.length, placed: payload.placed.length, ts: payload.ts });
       } catch (e) {
-        console.error("✗ SAVE FAILED:", e);
+        console.error("SAVE FAILED:", e);
       }
     }
 
@@ -1048,7 +989,7 @@ lockUiPanelInput(barracksPanel);
         sessionStorage.setItem(PENDING_KEY, raw);
         location.reload();
       } catch (e) {
-        console.error("✗ LOAD FAILED:", e);
+        console.error("LOAD FAILED:", e);
       }
     }
 
@@ -1062,11 +1003,11 @@ lockUiPanelInput(barracksPanel);
       if (!data || typeof data !== "object") return false;
 
       if (data.resources) {
-        state.resources.food = Number(data.resources.food ?? 0);
-        state.resources.wood = Number(data.resources.wood ?? 0);
+        state.resources.food  = Number(data.resources.food  ?? 0);
+        state.resources.wood  = Number(data.resources.wood  ?? 0);
         state.resources.stone = Number(data.resources.stone ?? 0);
-        state.resources.ore = Number(data.resources.ore ?? 0);
-        state.resources.gold = Number(data.resources.gold ?? 0);
+        state.resources.ore   = Number(data.resources.ore   ?? 0);
+        state.resources.gold  = Number(data.resources.gold  ?? 0);
       }
 
       if (typeof buildings.resetAllPlaced === "function") buildings.resetAllPlaced();
@@ -1098,56 +1039,33 @@ lockUiPanelInput(barracksPanel);
 
       try {
         const data = JSON.parse(pending);
-        const ok = await applyPayload(data);
-        console.log(ok ? "✓ Loaded" : "✗ Load failed", data);
+        await applyPayload(data);
       } catch (e) {
-        console.error("✗ Pending load failed:", e);
+        console.error("Pending load failed:", e);
       }
     })();
 
     document.getElementById("btnSave").onclick = saveGame;
     document.getElementById("btnLoad").onclick = loadGame;
     document.getElementById("btnReset").onclick = resetSave;
+
     setInterval(() => { try { saveGame(); } catch {} }, 10000);
 
     // =========================================================
-    // 13) MAIN LOOP
+    // 14) MAIN LOOP (NO PER-FRAME RECENTERING)
     // =========================================================
+    window.addEventListener("resize", () => {
+      updateUiOverlayRect();
+      if (popup.style.display !== "none") centerPanelOnScreen(popup);
+      if (barracksPanel.style.display !== "none") centerPanelOnScreen(barracksPanel);
+    });
+
     function frame() {
       scene.update();
       scene.render();
 
       processTrainingQueues();
       updateUiOverlayRect();
-
-        window.addEventListener("resize", () => {
-      updateUiOverlayRect();
-      if (popup.style.display !== "none") centerPanelOnScreen(popup);
-      if (barracksPanel.style.display !== "none") centerPanelOnScreen(barracksPanel);
-    });
-
-      function makePanelInteractive(panel) {
-        if (!panel) return;
-
-        // iOS: ensure taps are treated as taps
-        panel.style.touchAction = "manipulation";
-        panel.style.pointerEvents = "auto";
-
-        // Stop events from reaching the canvas/scene handlers
-        const stop = (e) => {
-          e.stopPropagation();
-        };
-
-        panel.addEventListener("pointerdown", stop, { passive: true });
-        panel.addEventListener("pointerup", stop, { passive: true });
-        panel.addEventListener("click", stop);
-
-        panel.addEventListener("touchstart", stop, { passive: true });
-        panel.addEventListener("touchend", stop, { passive: true });
-      }
-
-      makePanelInteractive(popup);
-      makePanelInteractive(barracksPanel);
 
       requestAnimationFrame(frame);
     }
