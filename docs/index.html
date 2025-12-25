@@ -1,4 +1,5 @@
-﻿<!doctype html>
+﻿<!-- docs/index.html -->
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -7,22 +8,20 @@
 
   <style>
     html, body { height:100%; margin:0; background:#0f1220; overflow:hidden; }
-
     canvas{
       position:fixed; inset:0; width:100%; height:100%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
-      touch-action:none;      /* pointer gestures on canvas */
+      touch-action:none;
       display:block;
     }
 
-    /* UI overlay clipped to visible map rect */
     #uiOverlay{
       position:fixed;
       left:0; top:0;
       width:0; height:0;
       overflow:hidden;
-      pointer-events:none; /* default pass-through; panels re-enable */
+      pointer-events:none;
       z-index:1000;
     }
 
@@ -45,9 +44,7 @@
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
 
-      box-shadow:
-        0 10px 30px rgba(0,0,0,.35),
-        inset 0 -1px 0 rgba(255,255,255,.06);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 -1px 0 rgba(255,255,255,.06);
       touch-action: manipulation;
     }
 
@@ -119,7 +116,6 @@
     .uiPanel, .uiPanel * { pointer-events:auto; }
     .uiPanel button, .uiPanel select, .uiPanel input { touch-action: manipulation; }
 
-    /* Build popup */
     #buildPopup{ display:none; }
     #buildTitle{ font-weight:900; margin-bottom:10px; font-size:14px; }
     #buildGrid{ display:block; }
@@ -151,10 +147,8 @@
     }
     .closeBtn:hover{ background:rgba(255,255,255,.16); }
 
-    /* Barracks */
     #barracksPanel{ display:none; width:420px; max-height:70vh; overflow:auto; }
 
-    /* Upgrade card */
     .upCard{
       background: rgba(0,0,0,.55);
       border: 1px solid rgba(255,255,255,.14);
@@ -227,7 +221,6 @@
       background: rgba(0,0,0,.35);
     }
 
-    /* Barracks tabs */
     .bxHeader{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .bxClose{
       padding:9px 12px;
@@ -283,19 +276,6 @@
     }
     .setRow label{ display:flex; align-items:center; gap:10px; font-weight:900; }
     .setHint{ margin-top:10px; font-size:12px; opacity:.8; line-height:1.3; }
-    .dangerBtn{
-      margin-top:10px;
-      width:100%;
-      border:0;
-      border-radius:14px;
-      padding:12px 12px;
-      font-weight:900;
-      cursor:pointer;
-      background:rgba(239,68,68,.95);
-      color:white;
-      touch-action:manipulation;
-    }
-    .dangerBtn:hover{ filter:brightness(1.05); }
     .neutralBtn{
       margin-top:10px;
       width:100%;
@@ -365,9 +345,6 @@
   </div>
 
   <script type="module">
-    // =========================================================
-    // 1) IMPORTS
-    // =========================================================
     import { CITY_PLOTS } from "./js/plots.city.js";
     import { BUILDINGS } from "./js/data/buildingCatalog.js";
     import { createcitybuildingsSystem } from "./js/systems/cityBuildings.js";
@@ -377,25 +354,15 @@
     import { getTrainingSnapshot, startTrainingInSlot, cancelTraining, syncBarracksSlots } from "./js/systems/trainingsystems.js";
     import { TROOPS, BARRACKS_TIER_UNLOCK } from "./js/data/troopsCatalog.js";
 
-    // =========================================================
-    // 2) CONSTANTS
-    // =========================================================
     const BASE_MAP_SRC = "./assets/maps/city/city_tilemap_base.png";
     const BUILDING_BASE_PATH = "./assets/city";
     const SAVE_KEY = "empire_city_save_v1";
     const PENDING_KEY = "EMPIRE_PENDING_LOAD";
 
-    // =========================================================
-    // 2.5) SETTINGS STATE (timersEnabled)
-    // =========================================================
     state.settings ??= {};
     if (typeof state.settings.timersEnabled !== "boolean") state.settings.timersEnabled = true;
 
-    // =========================================================
-    // 3) PURE POINTER EVENTS CANVAS SCENE (NO touch* listeners)
-    // =========================================================
     function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
     function loadImage(src){
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -405,7 +372,21 @@
       });
     }
 
-    function createCityScene(canvas, { baseMapSrc }) {
+    // ✅ NEW: infer map bounds from plots so cam math (clicking) works immediately
+    function inferMapSizeFromPlots(plots, fallbackW = 512, fallbackH = 512){
+      if (!Array.isArray(plots) || !plots.length) return { w: fallbackW, h: fallbackH };
+      let maxX = 0, maxY = 0;
+      for (const p of plots) {
+        const x2 = (Number(p.x) || 0) + (Number(p.w) || 0);
+        const y2 = (Number(p.y) || 0) + (Number(p.h) || 0);
+        if (x2 > maxX) maxX = x2;
+        if (y2 > maxY) maxY = y2;
+      }
+      // guard against tiny/zero maps
+      return { w: Math.max(fallbackW, Math.ceil(maxX)), h: Math.max(fallbackH, Math.ceil(maxY)) };
+    }
+
+    function createCityScene(canvas, { baseMapSrc, initialMapSize }) {
       const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
       ctx.imageSmoothingEnabled = false;
 
@@ -413,20 +394,13 @@
       let onPlotClick = null;
 
       let baseImg = null;
-      let baseW = 512, baseH = 512;
 
-      const cam = {
-        x: baseW/2,
-        y: baseH/2,
-        zoom: 2,
-        minZoom: 1,
-        maxZoom: 6
-      };
+      // ✅ initialize to plot-derived size so clicks work instantly
+      let baseW = initialMapSize?.w ?? 512;
+      let baseH = initialMapSize?.h ?? 512;
 
-      const sceneState = {
-        plots: [],
-        selectedPlotId: null,
-      };
+      const cam = { x: baseW/2, y: baseH/2, zoom: 2, minZoom: 1, maxZoom: 6 };
+      const sceneState = { plots: [], selectedPlotId: null };
 
       function resizeCanvas(){
         const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -444,7 +418,6 @@
         const cx = canvas.width/2, cy = canvas.height/2;
         return { x:(wx-cam.x)*cam.zoom+cx, y:(wy-cam.y)*cam.zoom+cy };
       }
-
       function screenToWorld(sx, sy){
         const cx = canvas.width/2, cy = canvas.height/2;
         return { x:(sx-cx)/cam.zoom+cam.x, y:(sy-cy)/cam.zoom+cam.y };
@@ -455,16 +428,10 @@
         const viewH = canvas.height / cam.zoom;
 
         if (viewW >= baseW) cam.x = baseW / 2;
-        else {
-          const half = viewW / 2;
-          cam.x = clamp(cam.x, half, baseW - half);
-        }
+        else cam.x = clamp(cam.x, viewW/2, baseW - viewW/2);
 
         if (viewH >= baseH) cam.y = baseH / 2;
-        else {
-          const half = viewH / 2;
-          cam.y = clamp(cam.y, half, baseH - half);
-        }
+        else cam.y = clamp(cam.y, viewH/2, baseH - viewH/2);
       }
 
       function computeMinZoomToFit(){
@@ -485,15 +452,15 @@
 
       function eventToCanvasXY(e){
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top)  * (canvas.height / rect.height);
-        return { x, y };
+        return {
+          x: (e.clientX - rect.left) * (canvas.width / rect.width),
+          y: (e.clientY - rect.top)  * (canvas.height / rect.height)
+        };
       }
 
       function pointInRect(px, py, r){
         return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
       }
-
       function pickPlot(wx, wy){
         for (let i = sceneState.plots.length - 1; i >= 0; i--) {
           const p = sceneState.plots[i];
@@ -514,17 +481,15 @@
         }
       }
 
-      // ---- Pointer pan/pinch/tap ----
-      const pointers = new Map(); // pointerId -> {x,y}
+      // Pointer pan/pinch/tap
+      const pointers = new Map();
       let isPanning = false;
       let panStart = { x:0, y:0, camX:0, camY:0 };
-      let down = null; // {x,y,time, moved, multi}
-      let pinchStart = null; // {dist, zoom, mid:{x,y}}
-
+      let down = null;
+      let pinchStart = null;
       const TAP_MOVE_PX = 10;
-
-      function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
-      function mid(a,b){ return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
+      const dist = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+      const mid  = (a,b)=>({ x:(a.x+b.x)/2, y:(a.y+b.y)/2 });
 
       canvas.addEventListener("wheel", (e) => {
         e.preventDefault();
@@ -562,10 +527,7 @@
           cam.x = panStart.camX - (p.x - panStart.x) / cam.zoom;
           cam.y = panStart.camY - (p.y - panStart.y) / cam.zoom;
           clampCameraToMap();
-
-          if (down && !down.moved) {
-            if (Math.hypot(p.x-down.x, p.y-down.y) > TAP_MOVE_PX) down.moved = true;
-          }
+          if (down && !down.moved && Math.hypot(p.x-down.x, p.y-down.y) > TAP_MOVE_PX) down.moved = true;
         } else if (pointers.size === 2 && pinchStart) {
           const [a,b] = Array.from(pointers.values());
           const d = dist(a,b);
@@ -590,7 +552,6 @@
 
         const wasTap = down && !down.moved && !down.multi;
         const recent = down && (performance.now() - down.time) < 650;
-
         if (wasTap && recent) firePickAtScreen(p.x, p.y);
 
         if (pointers.size === 1) {
@@ -611,17 +572,30 @@
         down = null;
       }, { passive:true });
 
-      async function init(){
+      // ✅ run a “quick init” so cam is valid before image finishes loading
+      (function quickInit(){
         resizeCanvas();
-        baseImg = await loadImage(baseMapSrc);
-        baseW = baseImg.width; baseH = baseImg.height;
-
-        cam.x = baseW/2; cam.y = baseH/2;
+        cam.x = baseW / 2;
+        cam.y = baseH / 2;
         cam.minZoom = computeMinZoomToFit();
         cam.zoom = Math.max(cam.zoom, cam.minZoom);
         clampCameraToMap();
-      }
-      init().catch(err => console.error("City init failed:", err));
+      })();
+
+      // load base map in background and sync to image size when available
+      (async function init(){
+        try {
+          baseImg = await loadImage(baseMapSrc);
+          baseW = baseImg.width; baseH = baseImg.height;
+
+          cam.x = baseW/2; cam.y = baseH/2;
+          cam.minZoom = computeMinZoomToFit();
+          cam.zoom = Math.max(cam.zoom, cam.minZoom);
+          clampCameraToMap();
+        } catch (err) {
+          console.error("City init failed:", err);
+        }
+      })();
 
       function drawBase(){
         const cx = canvas.width/2, cy = canvas.height/2;
@@ -696,53 +670,19 @@
         worldToScreen,
         getMapWidth(){ return baseW; },
         getMapHeight(){ return baseH; },
-        getCamera(){ return { ...cam }; }
       };
     }
 
-    // =========================================================
-    // 4) BOOT SCENE + SYSTEMS
-    // =========================================================
     const canvas = document.getElementById("cityCanvas");
-    const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC });
+
+    // ✅ pass plot-inferred size into the scene
+    const inferred = inferMapSizeFromPlots(CITY_PLOTS, 512, 512);
+    const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC, initialMapSize: inferred });
     scene.setPlots(CITY_PLOTS);
 
     const buildings = createcitybuildingsSystem({ basePath: BUILDING_BASE_PATH });
     scene.setBuildingsSystem(buildings);
 
-    // API wrappers (compatible with either old or new buildings system)
-    async function placeBuildingCompat(plotId, buildingId){
-      if (typeof buildings.placeBuildingOnPlot === "function") return await buildings.placeBuildingOnPlot(plotId, buildingId, 1);
-      if (typeof buildings.placeBuilding === "function") return buildings.placeBuilding({ plotId, buildingId });
-      return { ok:false, reason:"No placeBuilding method found" };
-    }
-    async function upgradePlotCompat(plotId){
-      if (typeof buildings.upgradePlot === "function") return await buildings.upgradePlot(plotId);
-      if (typeof buildings.startUpgrade === "function") return buildings.startUpgrade({ plotId });
-      return { ok:false, reason:"No upgrade method found" };
-    }
-    function canUpgradePlotCompat(plotId){
-      if (typeof buildings.canUpgradePlot === "function") return buildings.canUpgradePlot(plotId);
-      if (typeof buildings.canUpgrade === "function") {
-        const inst = buildings.getPlacedOnPlot?.(plotId);
-        return buildings.canUpgrade(inst);
-      }
-      return { ok:true, reason:"" };
-    }
-    function canBuildBuildingCompat(buildingId){
-      if (typeof buildings.canBuildBuilding === "function") return buildings.canBuildBuilding(buildingId);
-      return { ok:true, reason:"" };
-    }
-    function getStatusCompat(plotId){
-      return buildings.getStatus?.(plotId) || null;
-    }
-
-    const hasPendingLoad = !!sessionStorage.getItem(PENDING_KEY);
-    if (!hasPendingLoad) await buildings.ensureTownhall?.("townhall");
-
-    // =========================================================
-    // 5) UI OVERLAY RECT (map -> css px)
-    // =========================================================
     const uiOverlay = document.getElementById("uiOverlay");
     const resourceBar = document.getElementById("resourceBar");
     const resourceLeft = document.getElementById("resourceLeft");
@@ -750,12 +690,30 @@
     const popup = document.getElementById("buildPopup");
     const buildTitle = document.getElementById("buildTitle");
     const buildGrid = document.getElementById("buildGrid");
+   
 
     const barracksPanel = document.getElementById("barracksPanel");
     const settingsPanel = document.getElementById("settingsPanel");
+function isPanelVisible(el){
+  return !!el && getComputedStyle(el).display !== "none";
+}
+
+// Force initial inline state so resize/devtools doesn’t “recenter” hidden panels
+popup.style.display = "none";
+barracksPanel.style.display = "none";
+settingsPanel.style.display = "none";
 
     const timersToggle = document.getElementById("timersToggle");
     const timersStateText = document.getElementById("timersStateText");
+
+    let currentBuildPlot = null;
+    let barracksTab = "train";
+
+    function clampNum(v, a, b) {
+      v = Number(v);
+      if (!Number.isFinite(v)) return a;
+      return Math.max(a, Math.min(b, v));
+    }
 
     function syncSettingsUI(){
       timersToggle.checked = !!state.settings.timersEnabled;
@@ -768,25 +726,14 @@
       state.settings.timersEnabled = !!timersToggle.checked;
       syncSettingsUI();
 
-      // If timers got turned OFF, instantly finish anything in progress
       if (!state.settings.timersEnabled) {
         buildings.finishAllTimersNow?.();
-        // refresh open UIs if any
         if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
         if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
       }
 
       try { saveGame(); } catch {}
     });
-
-    let currentBuildPlot = null;
-    let barracksTab = "train";
-
-    const clampNum = (v, a, b) => {
-      v = Number(v);
-      if (!Number.isFinite(v)) return a;
-      return Math.max(a, Math.min(b, v));
-    };
 
     function getMapSizeSafe(){
       const w = (typeof scene.getMapWidth === "function") ? scene.getMapWidth() : 512;
@@ -825,9 +772,6 @@
       uiOverlay.style.height = `${bottom - top}px`;
     }
 
-    // =========================================================
-    // 6) PANEL PLACEMENT (CENTER ONLY ON OPEN/RESIZE)
-    // =========================================================
     function centerPanelOnScreen(panelEl){
       const r = canvas.getBoundingClientRect();
       const overlayRect = uiOverlay.getBoundingClientRect();
@@ -858,13 +802,10 @@
       panelEl.style.top  = `${y}px`;
     }
 
-    // =========================================================
-    // 7) iOS GHOST TAP / DOUBLE FIRE PROTECTION
-    // =========================================================
+    // iOS ghost-tap guard: prevent plot taps right after UI taps
     let lastUiActionAt = 0;
     function markUiAction(){ lastUiActionAt = performance.now(); }
     function uiJustHappened(ms = 450){ return (performance.now() - lastUiActionAt) < ms; }
-
     let lastDelegatedFire = 0;
 
     function isUiTargetEvent(e){
@@ -892,17 +833,9 @@
       if (!btn) return;
 
       const action = btn.getAttribute("data-action");
-
-      try {
-        await handleUiAction(action, btn);
-      } catch (err) {
-        console.error("UI action failed:", action, err);
-      }
+      await handleUiAction(action, btn);
     }, { capture:true, passive:false });
 
-    // =========================================================
-    // 8) COST + ECON HELPERS
-    // =========================================================
     function fmtCost(cost) {
       if (!cost) return "";
       const parts = [];
@@ -913,7 +846,6 @@
       if (cost.gold)  parts.push(`G:${cost.gold}`);
       return parts.length ? parts.join(" ") : "";
     }
-
     function fmtCostPretty(cost){
       if (!cost) return "?";
       const parts = [];
@@ -948,16 +880,12 @@
       const h = Math.floor((totalSec % 86400) / 3600);
       const m = Math.floor((totalSec % 3600) / 60);
       const s = totalSec % 60;
-
       if (d > 0) return `${d}d ${h}h ${m}m`;
       if (h > 0) return `${h}h ${m}m`;
       if (m > 0) return `${m}m ${s}s`;
       return `${s}s`;
     }
 
-    // =========================================================
-    // 9) STATE SYNC FROM BUILDINGS PLACED
-    // =========================================================
     function syncLevelsFromPlaced() {
       const lv = (state.buildings.levels ||= {});
       lv.townhall = 0;
@@ -979,13 +907,33 @@
       state.buildings.townhallLevel = lv.townhall || 0;
     }
 
-    // =========================================================
-    // 10) BUILD POPUP RENDER (NO per-button listeners)
-    // =========================================================
+    function getStatusCompat(plotId){
+      return buildings.getStatus?.(plotId) || null;
+    }
+
+    function canBuildBuildingCompat(buildingId){
+      return buildings.canBuildBuilding?.(buildingId) ?? { ok:true };
+    }
+
+    function canUpgradePlotCompat(plotId){
+      return buildings.canUpgradePlot?.(plotId) ?? { ok:true };
+    }
+
+    async function placeBuildingCompat(plotId, buildingId){
+      return await buildings.placeBuildingOnPlot(plotId, buildingId, 1);
+    }
+
+    async function upgradePlotCompat(plotId){
+      return await buildings.upgradePlot(plotId);
+    }
+
+function getQueueInfoSafe() {
+  return buildings.getBuildQueueInfo?.() || { active: 0, max: 2, full: false };
+}
+
     function renderBuildPopupForPlot(plot, { recenter=true } = {}){
       currentBuildPlot = plot;
       const existing = buildings.getPlacedOnPlot?.(plot.id);
-
       buildGrid.innerHTML = "";
 
       const st = getStatusCompat(plot.id);
@@ -1002,10 +950,13 @@
         const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
         const affordable = canAfford(upgradeCost);
 
-        // Disable while constructing/upgrading OR gating fails OR not affordable
-        const disabled = constructing || upgrading || (!chk.ok || !affordable || !upgradeCost);
+        const q = getQueueInfoSafe();
+        const queueBlocked = state.settings.timersEnabled && q.full;
+        const disabled = constructing || upgrading || queueBlocked || (!chk.ok || !affordable || !upgradeCost);
 
-        buildTitle.textContent = `Plot: ${plot.id} (Occupied)`;
+
+        const stateTag = constructing ? "Constructing" : upgrading ? "Upgrading" : "Occupied";
+        buildTitle.textContent = `Plot: ${plot.id} (${stateTag})`;
 
         let timerLine = "";
         if (constructing) {
@@ -1017,7 +968,6 @@
         buildGrid.innerHTML = `
           <div class="upCard">
             <div class="upTitle">${name}</div>
-
             <div class="upRow"><span>Current Level</span><b>${lvl}</b></div>
             <div class="upRow"><span>Cost</span><span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
 
@@ -1032,6 +982,8 @@
         `;
       } else {
         buildTitle.textContent = `Plot: ${plot.id} (Build)`;
+        const q = buildings.getQueueInfoSafe?.() || { full:false, max:2 };
+        const queueBlocked = state.settings.timersEnabled && q.full;
 
         const frag = document.createDocumentFragment();
 
@@ -1046,8 +998,7 @@
           btn.setAttribute("data-building-id", bKey);
           btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCost(cost)}` : ""}`;
 
-          const gate = canBuildBuildingCompat(bKey) ?? { ok:true };
-
+          const gate = canBuildBuildingCompat(bKey);
           if (!gate.ok) {
             btn.disabled = true;
             btn.style.opacity = "0.35";
@@ -1057,6 +1008,11 @@
             btn.style.opacity = "0.35";
             btn.title = "Not enough resources";
           }
+          if (queueBlocked) {
+            btn.disabled = true;
+            btn.style.opacity = "0.35";
+            btn.title = `All ${q.max} builder queues are busy.`;
+}
 
           frag.appendChild(btn);
         }
@@ -1068,9 +1024,7 @@
       if (recenter) centerPanelOnScreen(popup);
     }
 
-    // =========================================================
-    // 11) BARRACKS PANEL RENDER (delegation-ready)
-    // =========================================================
+    // Barracks panel (unchanged below)
     function fmtMMSS(ms) {
       const total = Math.max(0, Math.ceil(ms / 1000));
       const m = Math.floor(total / 60);
@@ -1127,7 +1081,6 @@
 
       const trainHtml = normalized.map((s, i) => {
         const isIdle = s.status === "idle" || !s.troopId;
-
         if (isIdle) {
           const options = opts.map(o => `<option value="${o.id}">${o.label}</option>`).join("");
           return `
@@ -1216,6 +1169,8 @@
             </button>
 
             ${timerLine}
+            ${(!constructing && !upgrading && queueBlocked) ? `<div class="upReason">All ${q.max} builder queues are busy.</div>` : ""}
+
             ${(!constructing && !upgrading && !chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
             ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable ? `<div class="upReason">Not enough resources</div>` : "")}
 
@@ -1230,7 +1185,7 @@
             <div style="font-size:14px;font-weight:900;">Barracks</div>
             <div style="opacity:.7;margin-top:2px;">L${barracksLevel}</div>
           </div>
-          <button id="barracksCloseBtn" class="bxClose" type="button" data-action="bx-close">Close</button>
+          <button class="bxClose" type="button" data-action="bx-close">Close</button>
         </div>
 
         <div class="bxWrap">
@@ -1240,12 +1195,12 @@
           </div>
 
           <div class="bxMain">
-            <div id="bxTab_train" style="display:${barracksTab==="train"?"block":"none"};">
+            <div style="display:${barracksTab==="train"?"block":"none"};">
               ${trainHtml || `<div style="opacity:.8">No slots found.</div>`}
               <div class="upHint">Tiers unlock: L1=T1, L5=T2, L10=T3, L15=T4</div>
             </div>
 
-            <div id="bxTab_upgrade" style="display:${barracksTab==="upgrade"?"block":"none"};">
+            <div style="display:${barracksTab==="upgrade"?"block":"none"};">
               ${upgradeBlock}
             </div>
           </div>
@@ -1255,9 +1210,6 @@
       if (recenter) centerPanelOnScreen(barracksPanel);
     }
 
-    // =========================================================
-    // 12) UI ACTION ROUTER (EVENT DELEGATION)
-    // =========================================================
     async function handleUiAction(action, el){
       if (action === "open-settings") {
         popup.style.display = "none";
@@ -1267,33 +1219,21 @@
         centerPanelOnScreen(settingsPanel);
         return;
       }
-
-      if (action === "settings-close") {
-        settingsPanel.style.display = "none";
-        return;
-      }
-
+      if (action === "settings-close") { settingsPanel.style.display = "none"; return; }
       if (action === "timers-finish-now") {
         buildings.finishAllTimersNow?.();
-        // refresh open UIs if any
         if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
         if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
         try { saveGame(); } catch {}
         return;
       }
-
-      if (action === "build-close") {
-        popup.style.display = "none";
-        return;
-      }
+      if (action === "build-close") { popup.style.display = "none"; return; }
 
       if (action === "build-upgrade") {
         const plot = currentBuildPlot;
         if (!plot) return;
-
         const st = getStatusCompat(plot.id);
-        if (st?.constructing) return; // safety
-        if (st?.upgrading) return;
+        if (st?.constructing || st?.upgrading) return;
 
         const res = await upgradePlotCompat(plot.id);
         if (!res?.ok) { alert(res?.reason || "Upgrade failed"); return; }
@@ -1307,7 +1247,6 @@
       if (action === "build-place") {
         const plot = currentBuildPlot;
         if (!plot) return;
-
         const bKey = el.getAttribute("data-building-id");
         if (!bKey) return;
 
@@ -1320,11 +1259,7 @@
         return;
       }
 
-      if (action === "bx-close") {
-        barracksPanel.style.display = "none";
-        return;
-      }
-
+      if (action === "bx-close") { barracksPanel.style.display = "none"; return; }
       if (action === "bx-tab") {
         barracksTab = el.getAttribute("data-tab") || "train";
         renderBarracksPanel({ recenter:true });
@@ -1336,14 +1271,11 @@
         const slotIndex = Number(el.getAttribute("data-slot"));
         const troopSel = barracksPanel.querySelector(`select[data-slot="${slotIndex}"][data-role="troop"]`);
         const amtInp  = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
-
         const troopId = troopSel?.value;
         const amount = Math.max(1, Number(amtInp?.value || 1));
         if (!troopId) return alert("No troop selected / unlocked.");
-
         const res = startTrainingInSlot({ barracksLevel, slotIndex, troopId, amount });
         if (!res?.ok) alert(res?.reason || "Could not start training.");
-
         renderBarracksPanel({ recenter:false });
         return;
       }
@@ -1351,10 +1283,8 @@
       if (action === "bx-cancel") {
         const slotIndex = Number(el.getAttribute("data-slot"));
         if (!confirm("Cancel this training slot?")) return;
-
         const res = cancelTraining?.({ slotIndex, refundPercent: 0.5 });
         if (res && res.ok === false) alert(res.reason || "Could not cancel.");
-
         renderBarracksPanel({ recenter:false });
         return;
       }
@@ -1376,14 +1306,9 @@
       }
     }
 
-    // =========================================================
-    // 13) PLOT CLICK BEHAVIOR (BLOCK IMMEDIATELY AFTER UI TAPS)
-    // =========================================================
     scene.setOnPlotClick((plot) => {
       if (!plot) return;
       if (uiJustHappened()) return;
-
-      // don’t let a plot click happen through settings
       if (settingsPanel.style.display !== "none") return;
 
       const existing = buildings.getPlacedOnPlot?.(plot.id);
@@ -1403,9 +1328,6 @@
       renderBuildPopupForPlot(plot, { recenter:true });
     });
 
-    // =========================================================
-    // 14) ECONOMY + RESOURCE BAR
-    // =========================================================
     const fmt = (n) => Math.floor(n || 0).toLocaleString();
     const fmtRate = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString();
 
@@ -1432,17 +1354,13 @@
     }
     requestAnimationFrame(economyFrame);
 
-    // =========================================================
-    // 15) SAVE / LOAD
-    // =========================================================
     function buildSavePayload() {
       syncLevelsFromPlaced();
       const placed = [];
+
       for (const plot of CITY_PLOTS) {
         const p = buildings.getPlacedOnPlot?.(plot.id);
         if (!p) continue;
-
-        // keep your old format, but include timer fields if present
         placed.push({
           plotId: plot.id,
           buildingId: p.buildingId,
@@ -1454,6 +1372,7 @@
           upgradingToLevel: p.upgradingToLevel ?? 0,
         });
       }
+
       return {
         v: 1,
         ts: Date.now(),
@@ -1465,31 +1384,23 @@
     }
 
     function saveGame() {
-      try {
-        const payload = buildSavePayload();
-        const json = JSON.stringify(payload);
-        localStorage.setItem(SAVE_KEY, json);
+      const payload = buildSavePayload();
+      const json = JSON.stringify(payload);
+      localStorage.setItem(SAVE_KEY, json);
 
-        const btn = document.getElementById("btnSave");
-        if (btn) {
-          const prev = btn.textContent;
-          btn.textContent = "Saved ✓";
-          setTimeout(() => (btn.textContent = prev), 900);
-        }
-      } catch (e) {
-        console.error("SAVE FAILED:", e);
+      const btn = document.getElementById("btnSave");
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = "Saved ✓";
+        setTimeout(() => (btn.textContent = prev), 900);
       }
     }
 
     function loadGame() {
-      try {
-        const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return console.warn("No save found.");
-        sessionStorage.setItem(PENDING_KEY, raw);
-        location.reload();
-      } catch (e) {
-        console.error("LOAD FAILED:", e);
-      }
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return console.warn("No save found.");
+      sessionStorage.setItem(PENDING_KEY, raw);
+      location.reload();
     }
 
     function resetSave() {
@@ -1516,52 +1427,33 @@
         syncSettingsUI();
       }
 
-      if (typeof buildings.resetAllPlaced === "function") buildings.resetAllPlaced();
-
       if (Array.isArray(data.placed)) {
-        for (const rec of data.placed) {
-          const plotId = String(rec.plotId);
-          const buildingId = String(rec.buildingId);
-          const targetLevel = Math.max(1, Number(rec.level ?? 1));
-
-          // place at L1 (may start construction depending on timersEnabled)
-          await placeBuildingCompat(plotId, buildingId);
-
-          // If save had live timers (buildEndAt/upgradeEndAt), prefer restoring those on the instance if supported
-          const inst = buildings.getPlacedOnPlot?.(plotId);
-          if (inst) {
-            if ("buildEndAt" in inst && rec.buildEndAt) inst.buildEndAt = Number(rec.buildEndAt) || 0;
-            if ("buildStartedAt" in inst && rec.buildStartedAt) inst.buildStartedAt = Number(rec.buildStartedAt) || 0;
-            if ("upgradeEndAt" in inst && rec.upgradeEndAt) inst.upgradeEndAt = Number(rec.upgradeEndAt) || 0;
-            if ("upgradeStartedAt" in inst && rec.upgradeStartedAt) inst.upgradeStartedAt = Number(rec.upgradeStartedAt) || 0;
-            if ("upgradingToLevel" in inst && rec.upgradingToLevel) inst.upgradingToLevel = Number(rec.upgradingToLevel) || 0;
-          }
-
-          // If no live upgrade timer in save, bring to targetLevel by upgrading (respects timers toggle)
-          if (!rec.upgradeEndAt) {
-            for (let lvl = 1; lvl < targetLevel; lvl++) {
-              const r = await upgradePlotCompat(plotId);
-              if (r && r.ok === false) break;
-            }
-          }
-        }
+        await buildings.hydrateFromSave?.(data.placed);
+      } else {
+        buildings.resetAllPlaced?.();
       }
 
-      await buildings.ensureTownhall?.("townhall");
+      await buildings.ensureTownhall?.();
       syncLevelsFromPlaced();
       return true;
     }
 
     (async function bootLoad() {
       const pending = sessionStorage.getItem(PENDING_KEY);
-      if (!pending) return;
-      sessionStorage.removeItem(PENDING_KEY);
+      if (!pending) {
+        await buildings.ensureTownhall?.();
+        syncLevelsFromPlaced();
+        return;
+      }
 
+      sessionStorage.removeItem(PENDING_KEY);
       try {
         const data = JSON.parse(pending);
         await applyPayload(data);
       } catch (e) {
         console.error("Pending load failed:", e);
+        await buildings.ensureTownhall?.();
+        syncLevelsFromPlaced();
       }
     })();
 
@@ -1570,31 +1462,14 @@
     document.getElementById("btnReset").onclick = resetSave;
     setInterval(() => { try { saveGame(); } catch {} }, 10000);
 
-    // =========================================================
-    // 16) MAIN LOOP
-    // =========================================================
-    window.addEventListener("resize", () => {
-      updateUiOverlayRect();
-      if (popup.style.display !== "none") centerPanelOnScreen(popup);
-      if (barracksPanel.style.display !== "none") centerPanelOnScreen(barracksPanel);
-      if (settingsPanel.style.display !== "none") centerPanelOnScreen(settingsPanel);
-    });
-
-    // smooth refresh while training
     setInterval(() => {
       if (barracksPanel.style.display === "none") return;
-
       const snap = getTrainingSnapshot?.("barracks") ?? {};
       const slots = normalizeSlots(snap);
-      const anyTraining = slots.some(s => s.status === "training");
-      if (!anyTraining) return;
-
-      requestAnimationFrame(() => {
-        renderBarracksPanel({ recenter:false });
-      });
+      if (!slots.some(s => s.status === "training")) return;
+      requestAnimationFrame(() => renderBarracksPanel({ recenter:false }));
     }, 250);
 
-    // timers tick throttled (keeps UI countdowns fresh without thrashing)
     let lastTimersTick = 0;
     function timersFrame(){
       const now = performance.now();
@@ -1603,20 +1478,23 @@
 
       const changed = buildings.tick?.() || false;
 
-      // if a panel is open, refresh its countdown text
-      if (popup.style.display !== "none" && currentBuildPlot) {
-        renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
-      }
-      if (barracksPanel.style.display !== "none") {
-        renderBarracksPanel({ recenter:false });
-      }
+      if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
+      if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
 
       if (changed) {
         syncLevelsFromPlaced();
-        // optional: autosave on timer completion
         try { saveGame(); } catch {}
       }
     }
+
+  window.addEventListener("resize", () => {
+  updateUiOverlayRect();
+  if (isPanelVisible(popup)) centerPanelOnScreen(popup);
+  if (isPanelVisible(barracksPanel)) centerPanelOnScreen(barracksPanel);
+  if (isPanelVisible(settingsPanel)) centerPanelOnScreen(settingsPanel);
+});
+
+
 
     function frame(){
       scene.update();
@@ -1624,7 +1502,6 @@
 
       processTrainingQueues();
       updateUiOverlayRect();
-
       timersFrame();
 
       requestAnimationFrame(frame);
