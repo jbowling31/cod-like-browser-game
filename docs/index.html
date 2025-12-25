@@ -1,4 +1,5 @@
-﻿<!doctype html>
+﻿<!-- index.html -->
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -276,8 +277,8 @@
     }
     .bxMain{ flex:1; min-width:0; }
   </style>
-  <link rel="icon" href="./favicon.ico">
 
+  <link rel="icon" href="./favicon.ico">
 </head>
 
 <body>
@@ -313,7 +314,7 @@
     import { createCityScene } from "./js/cityScene.js";
     import { CITY_PLOTS } from "./js/plots.city.js";
     import { BUILDINGS } from "./js/data/buildingCatalog.js";
-    import { createcitybuildingsSystem } from "./js/systems/cityBuildings.js"; // ? casing
+    import { createcitybuildingsSystem } from "./js/systems/cityBuildings.js";
     import { state } from "./js/state.js";
     import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
     import { processTrainingQueues } from "./js/systems/trainingsystems.js";
@@ -329,9 +330,58 @@
     const PENDING_KEY = "EMPIRE_PENDING_LOAD";
 
     // =========================================================
-    // 3) BOOT SCENE + SYSTEMS
+    // 3) CANVAS + iOS SAFARI TOUCH->POINTER BRIDGE
     // =========================================================
     const canvas = document.getElementById("cityCanvas");
+
+    (function enableIosTouchPointerBridge(canvasEl) {
+      if (!canvasEl) return;
+      const supportsPointer = "PointerEvent" in window;
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (!isIos || !supportsPointer) return;
+
+      const makePtr = (type, t) =>
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 1,
+          pointerType: "touch",
+          isPrimary: true,
+          clientX: t.clientX,
+          clientY: t.clientY,
+          screenX: t.screenX,
+          screenY: t.screenY,
+          buttons: type === "pointerup" ? 0 : 1,
+        });
+
+      canvasEl.addEventListener("touchstart", (e) => {
+        if (!e.changedTouches?.length) return;
+        const t = e.changedTouches[0];
+        canvasEl.dispatchEvent(makePtr("pointerdown", t));
+      }, { passive: true });
+
+      canvasEl.addEventListener("touchmove", (e) => {
+        if (!e.changedTouches?.length) return;
+        const t = e.changedTouches[0];
+        canvasEl.dispatchEvent(makePtr("pointermove", t));
+      }, { passive: true });
+
+      canvasEl.addEventListener("touchend", (e) => {
+        if (!e.changedTouches?.length) return;
+        const t = e.changedTouches[0];
+        canvasEl.dispatchEvent(makePtr("pointerup", t));
+      }, { passive: true });
+
+      canvasEl.addEventListener("touchcancel", (e) => {
+        if (!e.changedTouches?.length) return;
+        const t = e.changedTouches[0];
+        canvasEl.dispatchEvent(makePtr("pointercancel", t));
+      }, { passive: true });
+    })(canvas);
+
+    // =========================================================
+    // 4) BOOT SCENE + SYSTEMS
+    // =========================================================
     const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC });
     scene.setPlots(CITY_PLOTS);
 
@@ -342,12 +392,11 @@
     if (!hasPendingLoad) await buildings.ensureTownhall("townhall");
 
     // =========================================================
-    // 4) UI OVERLAY RECT (map -> css px)
+    // 5) UI OVERLAY RECT (map -> css px)
     // =========================================================
     const uiOverlay = document.getElementById("uiOverlay");
     const resourceBar = document.getElementById("resourceBar");
     const resourceLeft = document.getElementById("resourceLeft");
-    const floatingPanels = document.getElementById("floatingPanels");
 
     const clamp = (v, a, b) => {
       v = Number(v);
@@ -355,57 +404,35 @@
       return Math.max(a, Math.min(b, v));
     };
 
-// ✅ REAL user interaction gate (works on iOS Safari)
-let userInteracted = false;
-let lastUserPointerAt = 0;
-
-function markUserInteraction() {
-  userInteracted = true;
-  lastUserPointerAt = Date.now();
-}
-
-// Pointer Events (modern), Touch Events (iOS quirks), Mouse (desktop)
-canvas.addEventListener("pointerdown", markUserInteraction, { passive: true });
-canvas.addEventListener("touchstart", markUserInteraction, { passive: true });
-canvas.addEventListener("mousedown", markUserInteraction, { passive: true });
-
-// Optional: some engines fire click without pointerdown/touchstart in edge cases
-canvas.addEventListener("click", markUserInteraction, { passive: true });
-
-function isRecentUserClick() {
-  return (Date.now() - lastUserPointerAt) < 1200; // slightly more forgiving on mobile
-}
-
-
-    function getMapSizeSafe(){
+    function getMapSizeSafe() {
       const w = (typeof scene.getMapWidth === "function") ? scene.getMapWidth() : 512;
       const h = (typeof scene.getMapHeight === "function") ? scene.getMapHeight() : 512;
       return { w, h };
     }
 
-    function worldToScreenSafe(wx, wy){
+    function worldToScreenSafe(wx, wy) {
       if (typeof scene.worldToScreen === "function") return scene.worldToScreen(wx, wy);
       return { x: wx, y: wy };
     }
 
-    function canvasPxToCssPage(canvasPxX, canvasPxY){
+    function canvasPxToCssPage(canvasPxX, canvasPxY) {
       const r = canvas.getBoundingClientRect();
       return {
         x: r.left + (canvasPxX / canvas.width) * r.width,
-        y: r.top  + (canvasPxY / canvas.height) * r.height
+        y: r.top + (canvasPxY / canvas.height) * r.height,
       };
     }
 
-    function updateUiOverlayRect(){
+    function updateUiOverlayRect() {
       const { w: mapW, h: mapH } = getMapSizeSafe();
       const a = worldToScreenSafe(0, 0);
       const b = worldToScreenSafe(mapW, mapH);
       const A = canvasPxToCssPage(a.x, a.y);
       const B = canvasPxToCssPage(b.x, b.y);
 
-      const left   = Math.min(A.x, B.x);
-      const top    = Math.min(A.y, B.y);
-      const right  = Math.max(A.x, B.x);
+      const left = Math.min(A.x, B.x);
+      const top = Math.min(A.y, B.y);
+      const right = Math.max(A.x, B.x);
       const bottom = Math.max(A.y, B.y);
 
       uiOverlay.style.left = `${left}px`;
@@ -415,16 +442,16 @@ function isRecentUserClick() {
     }
 
     // =========================================================
-    // 5) PLACEMENT HELPERS (CENTERED PANELS)
+    // 6) PLACEMENT HELPERS (CENTERED PANELS)
     // =========================================================
-    function centerPanelOnScreen(panelEl){
+    function centerPanelOnScreen(panelEl) {
       const r = canvas.getBoundingClientRect();
       const overlayRect = uiOverlay.getBoundingClientRect();
 
       panelEl.style.display = "block";
       panelEl.style.visibility = "hidden";
       panelEl.style.left = "0px";
-      panelEl.style.top  = "0px";
+      panelEl.style.top = "0px";
 
       const pw = panelEl.offsetWidth;
       const ph = panelEl.offsetHeight;
@@ -432,10 +459,10 @@ function isRecentUserClick() {
       panelEl.style.visibility = "visible";
 
       const targetPageX = r.left + r.width / 2;
-      const targetPageY = r.top  + r.height / 2;
+      const targetPageY = r.top + r.height / 2;
 
       const localX = targetPageX - overlayRect.left - pw / 2;
-      const localY = targetPageY - overlayRect.top  - ph / 2;
+      const localY = targetPageY - overlayRect.top - ph / 2;
 
       const pad = 12;
       const barH = resourceBar.offsetHeight || 64;
@@ -444,37 +471,37 @@ function isRecentUserClick() {
       const y = clamp(localY, pad + barH, Math.max(pad + barH, overlayRect.height - ph - pad));
 
       panelEl.style.left = `${x}px`;
-      panelEl.style.top  = `${y}px`;
+      panelEl.style.top = `${y}px`;
     }
 
     // =========================================================
-    // 6) COST HELPERS (? use buildings map, NOT state.buildings.placed)
+    // 7) COST HELPERS
     // =========================================================
     function fmtCost(cost) {
       if (!cost) return "";
       const parts = [];
-      if (cost.food)  parts.push(`F:${cost.food}`);
-      if (cost.wood)  parts.push(`W:${cost.wood}`);
+      if (cost.food) parts.push(`F:${cost.food}`);
+      if (cost.wood) parts.push(`W:${cost.wood}`);
       if (cost.stone) parts.push(`S:${cost.stone}`);
-      if (cost.ore)   parts.push(`O:${cost.ore}`);
-      if (cost.gold)  parts.push(`G:${cost.gold}`);
+      if (cost.ore) parts.push(`O:${cost.ore}`);
+      if (cost.gold) parts.push(`G:${cost.gold}`);
       return parts.length ? parts.join(" ") : "";
     }
 
-    function fmtCostPretty(cost){
+    function fmtCostPretty(cost) {
       if (!cost) return "?";
       const parts = [];
-      if (cost.food)  parts.push(`F:${cost.food}`);
-      if (cost.wood)  parts.push(`W:${cost.wood}`);
+      if (cost.food) parts.push(`F:${cost.food}`);
+      if (cost.wood) parts.push(`W:${cost.wood}`);
       if (cost.stone) parts.push(`S:${cost.stone}`);
-      if (cost.ore)   parts.push(`O:${cost.ore}`);
-      if (cost.gold)  parts.push(`G:${cost.gold}`);
+      if (cost.ore) parts.push(`O:${cost.ore}`);
+      if (cost.gold) parts.push(`G:${cost.gold}`);
       return parts.length ? parts.join("  ") : "?";
     }
 
     function isResourceUnlocked(res) {
       if (res === "stone") return !!buildings.getByBuildingId?.("quarry");
-      if (res === "ore")   return !!buildings.getByBuildingId?.("mine");
+      if (res === "ore") return !!buildings.getByBuildingId?.("mine");
       return true;
     }
 
@@ -490,7 +517,7 @@ function isRecentUserClick() {
     }
 
     // =========================================================
-    // 7) BUILD POPUP (? instant refresh after upgrade)
+    // 8) BUILD POPUP (NO "USER INTERACTED" GATE)
     // =========================================================
     const popup = document.getElementById("buildPopup");
     const buildTitle = document.getElementById("buildTitle");
@@ -521,9 +548,7 @@ function isRecentUserClick() {
       state.buildings.townhallLevel = lv.townhall || 0;
     }
 
-    function openBuildPopup(plot){
-     
-
+    function openBuildPopup(plot) {
       const existing = buildings.getPlacedOnPlot(plot.id);
       buildGrid.innerHTML = "";
 
@@ -554,7 +579,7 @@ function isRecentUserClick() {
 
             <button id="btnUpgrade" class="upBtn"
               ${(!chk.ok || !affordable || !upgradeCost) ? "disabled" : ""}>
-              Upgrade ? Lv ${lvl + 1}
+              Upgrade → Lv ${lvl + 1}
             </button>
 
             ${!chk.ok ? `<div class="upReason">${chk.reason}</div>` : ""}
@@ -565,18 +590,12 @@ function isRecentUserClick() {
         const upBtn = buildGrid.querySelector("#btnUpgrade");
         if (upBtn && !upBtn.disabled) {
           upBtn.onclick = async () => {
-            const prevLevel = (buildings.getPlacedOnPlot(plot.id)?.level ?? 1);
             const res = await buildings.upgradePlot(plot.id);
-
             if (!res?.ok) {
               alert(res?.reason || "Upgrade failed");
               return;
             }
-
-            // ? keep state levels in sync for HUD + anything else reading them
             syncLevelsFromPlaced();
-
-            // ? immediate UI refresh from authoritative map
             openBuildPopup(plot);
             centerPanelOnScreen(popup);
           };
@@ -587,7 +606,6 @@ function isRecentUserClick() {
         return;
       }
 
-      // EMPTY plot: build menu
       buildTitle.textContent = `Plot: ${plot.id} (Build)`;
       for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")) {
         const def = BUILDINGS[bKey];
@@ -597,7 +615,7 @@ function isRecentUserClick() {
         btn.className = "buildBtn";
         btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCost(cost)}` : ""}`;
 
-        const gate = buildings.canBuildBuilding?.(bKey) ?? { ok:true };
+        const gate = buildings.canBuildBuilding?.(bKey) ?? { ok: true };
 
         if (!gate.ok) {
           btn.disabled = true;
@@ -624,7 +642,7 @@ function isRecentUserClick() {
     }
 
     // =========================================================
-    // 8) BARRACKS PANEL (your existing code left mostly intact)
+    // 9) BARRACKS PANEL
     // =========================================================
     const barracksPanel = document.getElementById("barracksPanel");
     barracksPanel.style.display = "none";
@@ -644,12 +662,12 @@ function isRecentUserClick() {
       const total = Math.max(0, Math.ceil(ms / 1000));
       const m = Math.floor(total / 60);
       const s = total % 60;
-      return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+      return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
     }
 
     function unlockedTiersForBarracksLevel(lvl) {
       const tiers = [];
-      for (const tier of ["T1","T2","T3","T4"]) {
+      for (const tier of ["T1", "T2", "T3", "T4"]) {
         if ((BARRACKS_TIER_UNLOCK?.[tier] ?? 999) <= lvl) tiers.push(tier);
       }
       return tiers;
@@ -666,11 +684,11 @@ function isRecentUserClick() {
       return Number(state?.buildings?.levels?.barracks || 0);
     }
 
-    function findBarracksPlot(){
+    function findBarracksPlot() {
       return CITY_PLOTS.find(p => buildings.getPlacedOnPlot(p.id)?.buildingId === "barracks") || null;
     }
 
-    function normalizeSlots(snap){
+    function normalizeSlots(snap) {
       let slots = snap?.slots ?? snap?.items ?? snap?.queue ?? snap?.queues?.barracks ?? snap?.queues;
       if (!Array.isArray(slots)) slots = slots ? Object.values(slots).flat() : [];
       return slots.map((s) => {
@@ -679,10 +697,10 @@ function isRecentUserClick() {
           const now = Date.now();
           const totalMs = job.totalMs ?? Math.max(1, (job.endAt ?? now) - (job.startAt ?? now));
           const remainingMs = Math.max(0, (job.endAt ?? now) - now);
-          return { status:"training", troopId:job.troopId, amount:job.amount, totalMs, remainingMs };
+          return { status: "training", troopId: job.troopId, amount: job.amount, totalMs, remainingMs };
         }
         if (s?.status) return s;
-        return { status:"idle" };
+        return { status: "idle" };
       });
     }
 
@@ -702,7 +720,7 @@ function isRecentUserClick() {
           return `
             <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <b>Slot ${i+1}</b>
+                <b>Slot ${i + 1}</b>
                 <span style="opacity:.7">Idle</span>
               </div>
 
@@ -731,8 +749,8 @@ function isRecentUserClick() {
         return `
           <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <b>Slot ${i+1}</b>
-              <span style="opacity:.9">${s.troopId} ? ${s.amount}</span>
+              <b>Slot ${i + 1}</b>
+              <span style="opacity:.9">${s.troopId} × ${s.amount}</span>
             </div>
 
             <div style="margin-top:10px; height:10px; background:rgba(255,255,255,.12); border-radius:999px; overflow:hidden;">
@@ -772,7 +790,7 @@ function isRecentUserClick() {
             <div class="upRow"><span>Cost:</span> <span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
 
             <button id="bxUpgradeBtn" class="upBtn" ${disabled ? "disabled" : ""}>
-              Upgrade ? Lv ${lvl+1}
+              Upgrade → Lv ${lvl + 1}
             </button>
 
             ${(!chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
@@ -796,17 +814,17 @@ function isRecentUserClick() {
 
         <div class="bxWrap">
           <div class="bxTabs">
-            <button class="bxTab ${barracksTab==="train"?"active":""}" data-tab="train" type="button">Train</button>
-            <button class="bxTab ${barracksTab==="upgrade"?"active":""}" data-tab="upgrade" type="button">Upgrade</button>
+            <button class="bxTab ${barracksTab === "train" ? "active" : ""}" data-tab="train" type="button">Train</button>
+            <button class="bxTab ${barracksTab === "upgrade" ? "active" : ""}" data-tab="upgrade" type="button">Upgrade</button>
           </div>
 
           <div class="bxMain">
-            <div id="bxTab_train" style="display:${barracksTab==="train"?"block":"none"};">
+            <div id="bxTab_train" style="display:${barracksTab === "train" ? "block" : "none"};">
               ${trainHtml || `<div style="opacity:.8">No slots found.</div>`}
               <div class="upHint">Tiers unlock: L1=T1, L5=T2, L10=T3, L15=T4</div>
             </div>
 
-            <div id="bxTab_upgrade" style="display:${barracksTab==="upgrade"?"block":"none"};">
+            <div id="bxTab_upgrade" style="display:${barracksTab === "upgrade" ? "block" : "none"};">
               ${upgradeBlock}
             </div>
           </div>
@@ -827,7 +845,7 @@ function isRecentUserClick() {
         btn.onclick = () => {
           const slotIndex = Number(btn.getAttribute("data-slot"));
           const troopSel = barracksPanel.querySelector(`select[data-slot="${slotIndex}"][data-role="troop"]`);
-          const amtInp  = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
+          const amtInp = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
           const troopId = troopSel?.value;
           const amount = Math.max(1, Number(amtInp?.value || 1));
           if (!troopId) return alert("No troop selected / unlocked.");
@@ -859,7 +877,6 @@ function isRecentUserClick() {
       }
     }
 
-    // smooth refresh while training
     setInterval(() => {
       if (barracksPanel.style.display === "none") return;
       if (barracksUserEditing) return;
@@ -879,11 +896,10 @@ function isRecentUserClick() {
     }, 250);
 
     // =========================================================
-    // 9) CLICK BEHAVIOR
+    // 10) CLICK BEHAVIOR (NO "RECENT CLICK" GATE)
     // =========================================================
     scene.setOnPlotClick((plot) => {
       if (!plot) return;
-      
 
       const existing = buildings.getPlacedOnPlot(plot.id);
       const isBarracks = existing?.buildingId === "barracks";
@@ -900,19 +916,14 @@ function isRecentUserClick() {
       barracksPanel.style.display = "none";
       openBuildPopup(plot);
     });
-scene.setOnPlotClick((plot) => {
-  console.log("plot click", plot?.id, Date.now() - lastUserPointerAt, userInteracted);
-  
-
-});
 
     // =========================================================
-    // 10) ECONOMY + RESOURCE BAR
+    // 11) ECONOMY + RESOURCE BAR
     // =========================================================
     const fmt = (n) => Math.floor(n || 0).toLocaleString();
     const fmtRate = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString();
 
-    function renderResourceBar(){
+    function renderResourceBar() {
       const p = getProductionPerSecond();
       resourceLeft.innerHTML = `
         <div class="resItem"><b>Food</b> ${fmt(state.resources.food)} <span>(+${fmtRate(p.food)}/s)</span></div>
@@ -925,7 +936,7 @@ scene.setOnPlotClick((plot) => {
     }
 
     let econLast = 0;
-    function economyFrame(t){
+    function economyFrame(t) {
       const dt = econLast ? (t - econLast) / 1000 : 0;
       econLast = t;
       updateEconomy(dt);
@@ -935,7 +946,7 @@ scene.setOnPlotClick((plot) => {
     requestAnimationFrame(economyFrame);
 
     // =========================================================
-    // 11) SAVE / LOAD (your existing)
+    // 12) SAVE / LOAD
     // =========================================================
     function buildSavePayload() {
       syncLevelsFromPlaced();
@@ -963,12 +974,12 @@ scene.setOnPlotClick((plot) => {
         const btn = document.getElementById("btnSave");
         if (btn) {
           const prev = btn.textContent;
-          btn.textContent = "Saved ?";
+          btn.textContent = "Saved ✓";
           setTimeout(() => (btn.textContent = prev), 900);
         }
-        console.log("? Saved", { bytes: json.length, placed: payload.placed.length, ts: payload.ts });
+        console.log("✓ Saved", { bytes: json.length, placed: payload.placed.length, ts: payload.ts });
       } catch (e) {
-        console.error("? SAVE FAILED:", e);
+        console.error("✗ SAVE FAILED:", e);
       }
     }
 
@@ -979,7 +990,7 @@ scene.setOnPlotClick((plot) => {
         sessionStorage.setItem(PENDING_KEY, raw);
         location.reload();
       } catch (e) {
-        console.error("? LOAD FAILED:", e);
+        console.error("✗ LOAD FAILED:", e);
       }
     }
 
@@ -993,11 +1004,11 @@ scene.setOnPlotClick((plot) => {
       if (!data || typeof data !== "object") return false;
 
       if (data.resources) {
-        state.resources.food  = Number(data.resources.food  ?? 0);
-        state.resources.wood  = Number(data.resources.wood  ?? 0);
+        state.resources.food = Number(data.resources.food ?? 0);
+        state.resources.wood = Number(data.resources.wood ?? 0);
         state.resources.stone = Number(data.resources.stone ?? 0);
-        state.resources.ore   = Number(data.resources.ore   ?? 0);
-        state.resources.gold  = Number(data.resources.gold  ?? 0);
+        state.resources.ore = Number(data.resources.ore ?? 0);
+        state.resources.gold = Number(data.resources.gold ?? 0);
       }
 
       if (typeof buildings.resetAllPlaced === "function") buildings.resetAllPlaced();
@@ -1030,9 +1041,9 @@ scene.setOnPlotClick((plot) => {
       try {
         const data = JSON.parse(pending);
         const ok = await applyPayload(data);
-        console.log(ok ? "? Loaded" : "? Load failed", data);
+        console.log(ok ? "✓ Loaded" : "✗ Load failed", data);
       } catch (e) {
-        console.error("? Pending load failed:", e);
+        console.error("✗ Pending load failed:", e);
       }
     })();
 
@@ -1042,9 +1053,9 @@ scene.setOnPlotClick((plot) => {
     setInterval(() => { try { saveGame(); } catch {} }, 10000);
 
     // =========================================================
-    // 12) MAIN LOOP
+    // 13) MAIN LOOP
     // =========================================================
-    function frame(){
+    function frame() {
       scene.update();
       scene.render();
 
