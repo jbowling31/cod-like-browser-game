@@ -267,6 +267,48 @@
       color:#eafff2;
     }
     .bxMain{ flex:1; min-width:0; }
+
+    /* Settings Panel */
+    #settingsPanel{ display:none; width:380px; }
+    .setRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      margin-top:10px;
+    }
+    .setRow label{ display:flex; align-items:center; gap:10px; font-weight:900; }
+    .setHint{ margin-top:10px; font-size:12px; opacity:.8; line-height:1.3; }
+    .dangerBtn{
+      margin-top:10px;
+      width:100%;
+      border:0;
+      border-radius:14px;
+      padding:12px 12px;
+      font-weight:900;
+      cursor:pointer;
+      background:rgba(239,68,68,.95);
+      color:white;
+      touch-action:manipulation;
+    }
+    .dangerBtn:hover{ filter:brightness(1.05); }
+    .neutralBtn{
+      margin-top:10px;
+      width:100%;
+      border:1px solid rgba(255,255,255,.16);
+      border-radius:14px;
+      padding:12px 12px;
+      font-weight:900;
+      cursor:pointer;
+      background:rgba(255,255,255,.10);
+      color:#fff;
+      touch-action:manipulation;
+    }
+    .neutralBtn:hover{ background:rgba(255,255,255,.16); }
   </style>
 
   <link rel="icon" href="./favicon.ico">
@@ -279,6 +321,7 @@
     <div id="resourceBar">
       <div id="resourceLeft"></div>
       <div id="resourceRight">
+        <button id="btnSettings" type="button" data-action="open-settings">Settings</button>
         <button id="btnSave" type="button">Save</button>
         <button id="btnLoad" type="button">Load</button>
         <button id="btnReset" type="button">Reset</button>
@@ -295,6 +338,29 @@
       </div>
 
       <div id="barracksPanel" class="uiPanel"></div>
+
+      <div id="settingsPanel" class="uiPanel">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="font-weight:900; font-size:14px;">Settings</div>
+          <button class="closeBtn" type="button" data-action="settings-close">Close</button>
+        </div>
+
+        <div class="setRow">
+          <label>
+            <input id="timersToggle" type="checkbox" />
+            Build/Upgrade Timers
+          </label>
+          <span id="timersStateText" style="opacity:.85; font-weight:900;">ON</span>
+        </div>
+
+        <button class="neutralBtn" type="button" data-action="timers-finish-now">
+          Finish any active timers now
+        </button>
+
+        <div class="setHint">
+          Turn timers <b>OFF</b> to test instantly. If you toggle OFF while anything is in progress, it will auto-finish so you don’t get stuck.
+        </div>
+      </div>
     </div>
   </div>
 
@@ -318,6 +384,12 @@
     const BUILDING_BASE_PATH = "./assets/city";
     const SAVE_KEY = "empire_city_save_v1";
     const PENDING_KEY = "EMPIRE_PENDING_LOAD";
+
+    // =========================================================
+    // 2.5) SETTINGS STATE (timersEnabled)
+    // =========================================================
+    state.settings ??= {};
+    if (typeof state.settings.timersEnabled !== "boolean") state.settings.timersEnabled = true;
 
     // =========================================================
     // 3) PURE POINTER EVENTS CANVAS SCENE (NO touch* listeners)
@@ -471,13 +543,8 @@
           panStart = { x:p.x, y:p.y, camX:cam.x, camY:cam.y };
           down = { x:p.x, y:p.y, time:performance.now(), moved:false, multi:false };
         } else if (pointers.size === 2) {
-          // start pinch
           const [a,b] = Array.from(pointers.values());
-          pinchStart = {
-            dist: dist(a,b),
-            zoom: cam.zoom,
-            mid: mid(a,b),
-          };
+          pinchStart = { dist: dist(a,b), zoom: cam.zoom, mid: mid(a,b) };
           if (down) down.multi = true;
           isPanning = false;
         } else {
@@ -524,12 +591,9 @@
         const wasTap = down && !down.moved && !down.multi;
         const recent = down && (performance.now() - down.time) < 650;
 
-        if (wasTap && recent) {
-          firePickAtScreen(p.x, p.y);
-        }
+        if (wasTap && recent) firePickAtScreen(p.x, p.y);
 
         if (pointers.size === 1) {
-          // if one pointer remains, resume pan from its position
           const only = Array.from(pointers.values())[0];
           isPanning = true;
           panStart = { x: only.x, y: only.y, camX: cam.x, camY: cam.y };
@@ -537,7 +601,6 @@
           isPanning = false;
           pinchStart = null;
         }
-
         down = null;
       }, { passive:true });
 
@@ -647,8 +710,35 @@
     const buildings = createcitybuildingsSystem({ basePath: BUILDING_BASE_PATH });
     scene.setBuildingsSystem(buildings);
 
+    // API wrappers (compatible with either old or new buildings system)
+    async function placeBuildingCompat(plotId, buildingId){
+      if (typeof buildings.placeBuildingOnPlot === "function") return await buildings.placeBuildingOnPlot(plotId, buildingId, 1);
+      if (typeof buildings.placeBuilding === "function") return buildings.placeBuilding({ plotId, buildingId });
+      return { ok:false, reason:"No placeBuilding method found" };
+    }
+    async function upgradePlotCompat(plotId){
+      if (typeof buildings.upgradePlot === "function") return await buildings.upgradePlot(plotId);
+      if (typeof buildings.startUpgrade === "function") return buildings.startUpgrade({ plotId });
+      return { ok:false, reason:"No upgrade method found" };
+    }
+    function canUpgradePlotCompat(plotId){
+      if (typeof buildings.canUpgradePlot === "function") return buildings.canUpgradePlot(plotId);
+      if (typeof buildings.canUpgrade === "function") {
+        const inst = buildings.getPlacedOnPlot?.(plotId);
+        return buildings.canUpgrade(inst);
+      }
+      return { ok:true, reason:"" };
+    }
+    function canBuildBuildingCompat(buildingId){
+      if (typeof buildings.canBuildBuilding === "function") return buildings.canBuildBuilding(buildingId);
+      return { ok:true, reason:"" };
+    }
+    function getStatusCompat(plotId){
+      return buildings.getStatus?.(plotId) || null;
+    }
+
     const hasPendingLoad = !!sessionStorage.getItem(PENDING_KEY);
-    if (!hasPendingLoad) await buildings.ensureTownhall("townhall");
+    if (!hasPendingLoad) await buildings.ensureTownhall?.("townhall");
 
     // =========================================================
     // 5) UI OVERLAY RECT (map -> css px)
@@ -662,6 +752,32 @@
     const buildGrid = document.getElementById("buildGrid");
 
     const barracksPanel = document.getElementById("barracksPanel");
+    const settingsPanel = document.getElementById("settingsPanel");
+
+    const timersToggle = document.getElementById("timersToggle");
+    const timersStateText = document.getElementById("timersStateText");
+
+    function syncSettingsUI(){
+      timersToggle.checked = !!state.settings.timersEnabled;
+      timersStateText.textContent = state.settings.timersEnabled ? "ON" : "OFF";
+      timersStateText.style.opacity = state.settings.timersEnabled ? "0.9" : "0.8";
+    }
+    syncSettingsUI();
+
+    timersToggle.addEventListener("change", () => {
+      state.settings.timersEnabled = !!timersToggle.checked;
+      syncSettingsUI();
+
+      // If timers got turned OFF, instantly finish anything in progress
+      if (!state.settings.timersEnabled) {
+        buildings.finishAllTimersNow?.();
+        // refresh open UIs if any
+        if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
+        if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
+      }
+
+      try { saveGame(); } catch {}
+    });
 
     let currentBuildPlot = null;
     let barracksTab = "train";
@@ -749,7 +865,6 @@
     function markUiAction(){ lastUiActionAt = performance.now(); }
     function uiJustHappened(ms = 450){ return (performance.now() - lastUiActionAt) < ms; }
 
-    // Delegated UI handler uses capture phase to block canvas, and handles action itself.
     let lastDelegatedFire = 0;
 
     function isUiTargetEvent(e){
@@ -765,7 +880,6 @@
     uiOverlay.addEventListener("pointerup", async (e) => {
       if (!isUiTargetEvent(e)) return;
 
-      // dedupe fast double pointer events
       const now = performance.now();
       if (now - lastDelegatedFire < 250) return;
       lastDelegatedFire = now;
@@ -828,6 +942,19 @@
       return true;
     }
 
+    function fmtDuration(ms){
+      const totalSec = Math.max(0, Math.ceil(ms / 1000));
+      const d = Math.floor(totalSec / 86400);
+      const h = Math.floor((totalSec % 86400) / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+
+      if (d > 0) return `${d}d ${h}h ${m}m`;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+
     // =========================================================
     // 9) STATE SYNC FROM BUILDINGS PLACED
     // =========================================================
@@ -844,7 +971,7 @@
       lv.commandcenter = 0;
 
       for (const plot of CITY_PLOTS) {
-        const placed = buildings.getPlacedOnPlot(plot.id);
+        const placed = buildings.getPlacedOnPlot?.(plot.id);
         if (!placed) continue;
         const key = placed.buildingId;
         if (Object.prototype.hasOwnProperty.call(lv, key)) lv[key] = placed.level ?? 1;
@@ -855,23 +982,37 @@
     // =========================================================
     // 10) BUILD POPUP RENDER (NO per-button listeners)
     // =========================================================
-    function renderBuildPopupForPlot(plot){
+    function renderBuildPopupForPlot(plot, { recenter=true } = {}){
       currentBuildPlot = plot;
-      const existing = buildings.getPlacedOnPlot(plot.id);
+      const existing = buildings.getPlacedOnPlot?.(plot.id);
 
       buildGrid.innerHTML = "";
+
+      const st = getStatusCompat(plot.id);
 
       if (existing) {
         const lvl = existing.level ?? 1;
         const def = BUILDINGS[existing.buildingId];
         const name = def?.name || existing.buildingId;
 
-        const chk = buildings.canUpgradePlot(plot.id);
+        const constructing = !!st?.constructing;
+        const upgrading = !!st?.upgrading;
+
+        const chk = canUpgradePlotCompat(plot.id);
         const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
         const affordable = canAfford(upgradeCost);
-        const disabled = (!chk.ok || !affordable || !upgradeCost);
+
+        // Disable while constructing/upgrading OR gating fails OR not affordable
+        const disabled = constructing || upgrading || (!chk.ok || !affordable || !upgradeCost);
 
         buildTitle.textContent = `Plot: ${plot.id} (Occupied)`;
+
+        let timerLine = "";
+        if (constructing) {
+          timerLine = `<div class="upReason">Under construction… <b>${fmtDuration(st.buildRemainingMs)}</b> left</div>`;
+        } else if (upgrading) {
+          timerLine = `<div class="upReason">Upgrading to <b>Lv ${st.upgradingToLevel || (lvl+1)}</b>… <b>${fmtDuration(st.upgradeRemainingMs)}</b> left</div>`;
+        }
 
         buildGrid.innerHTML = `
           <div class="upCard">
@@ -881,11 +1022,12 @@
             <div class="upRow"><span>Cost</span><span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
 
             <button class="upBtn" type="button" data-action="build-upgrade" ${disabled ? "disabled" : ""}>
-              Upgrade → Lv ${lvl + 1}
+              ${upgrading ? "Upgrading…" : `Upgrade → Lv ${lvl + 1}`}
             </button>
 
-            ${!chk.ok ? `<div class="upReason">${chk.reason}</div>` : ""}
-            ${(chk.ok && upgradeCost && !affordable) ? `<div class="upReason">Not enough resources</div>` : ""}
+            ${timerLine}
+            ${(!constructing && !upgrading && !chk.ok) ? `<div class="upReason">${chk.reason}</div>` : ""}
+            ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable) ? `<div class="upReason">Not enough resources</div>` : ""}
           </div>
         `;
       } else {
@@ -904,7 +1046,7 @@
           btn.setAttribute("data-building-id", bKey);
           btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCost(cost)}` : ""}`;
 
-          const gate = buildings.canBuildBuilding?.(bKey) ?? { ok:true };
+          const gate = canBuildBuildingCompat(bKey) ?? { ok:true };
 
           if (!gate.ok) {
             btn.disabled = true;
@@ -923,7 +1065,7 @@
       }
 
       popup.style.display = "block";
-      centerPanelOnScreen(popup);
+      if (recenter) centerPanelOnScreen(popup);
     }
 
     // =========================================================
@@ -956,7 +1098,7 @@
     }
 
     function findBarracksPlot(){
-      return CITY_PLOTS.find(p => buildings.getPlacedOnPlot(p.id)?.buildingId === "barracks") || null;
+      return CITY_PLOTS.find(p => buildings.getPlacedOnPlot?.(p.id)?.buildingId === "barracks") || null;
     }
 
     function normalizeSlots(snap){
@@ -975,7 +1117,7 @@
       });
     }
 
-    function renderBarracksPanel(){
+    function renderBarracksPanel({ recenter=true } = {}){
       const barracksLevel = getBarracksLevelSafe();
       try { syncBarracksSlots?.(barracksLevel); } catch {}
 
@@ -1043,16 +1185,25 @@
       }).join("");
 
       const barracksPlot = findBarracksPlot();
-      const barracksPlaced = barracksPlot ? buildings.getPlacedOnPlot(barracksPlot.id) : null;
+      const barracksPlaced = barracksPlot ? buildings.getPlacedOnPlot?.(barracksPlot.id) : null;
 
       let upgradeBlock = `<div style="opacity:.85">No barracks placed yet.</div>`;
       if (barracksPlaced && barracksPlot) {
         const lvl = barracksPlaced.level ?? 1;
-        const chk = buildings.canUpgradePlot(barracksPlot.id);
+        const chk = canUpgradePlotCompat(barracksPlot.id);
         const def = BUILDINGS?.barracks;
         const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
         const affordable = canAfford(upgradeCost);
-        const disabled = (!chk.ok || (upgradeCost && !affordable) || !upgradeCost);
+
+        const st = getStatusCompat(barracksPlot.id);
+        const upgrading = !!st?.upgrading;
+        const constructing = !!st?.constructing;
+
+        const disabled = constructing || upgrading || (!chk.ok || (upgradeCost && !affordable) || !upgradeCost);
+
+        let timerLine = "";
+        if (constructing) timerLine = `<div class="upReason">Under construction… <b>${fmtDuration(st.buildRemainingMs)}</b> left</div>`;
+        if (upgrading) timerLine = `<div class="upReason">Upgrading… <b>${fmtDuration(st.upgradeRemainingMs)}</b> left</div>`;
 
         upgradeBlock = `
           <div class="upCard">
@@ -1061,11 +1212,12 @@
             <div class="upRow"><span>Cost:</span> <span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
 
             <button type="button" class="upBtn" data-action="bx-upgrade" ${disabled ? "disabled" : ""}>
-              Upgrade → Lv ${lvl+1}
+              ${upgrading ? "Upgrading…" : `Upgrade → Lv ${lvl+1}`}
             </button>
 
-            ${(!chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
-            ${(chk.ok && upgradeCost && !affordable ? `<div class="upReason">Not enough resources</div>` : "")}
+            ${timerLine}
+            ${(!constructing && !upgrading && !chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
+            ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable ? `<div class="upReason">Not enough resources</div>` : "")}
 
             <div class="upHint">Tiers unlock: L1=T1, L5=T2, L10=T3, L15=T4</div>
           </div>
@@ -1099,12 +1251,37 @@
           </div>
         </div>
       `;
+
+      if (recenter) centerPanelOnScreen(barracksPanel);
     }
 
     // =========================================================
     // 12) UI ACTION ROUTER (EVENT DELEGATION)
     // =========================================================
     async function handleUiAction(action, el){
+      if (action === "open-settings") {
+        popup.style.display = "none";
+        barracksPanel.style.display = "none";
+        settingsPanel.style.display = "block";
+        syncSettingsUI();
+        centerPanelOnScreen(settingsPanel);
+        return;
+      }
+
+      if (action === "settings-close") {
+        settingsPanel.style.display = "none";
+        return;
+      }
+
+      if (action === "timers-finish-now") {
+        buildings.finishAllTimersNow?.();
+        // refresh open UIs if any
+        if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
+        if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
+        try { saveGame(); } catch {}
+        return;
+      }
+
       if (action === "build-close") {
         popup.style.display = "none";
         return;
@@ -1114,12 +1291,16 @@
         const plot = currentBuildPlot;
         if (!plot) return;
 
-        const res = await buildings.upgradePlot(plot.id);
+        const st = getStatusCompat(plot.id);
+        if (st?.constructing) return; // safety
+        if (st?.upgrading) return;
+
+        const res = await upgradePlotCompat(plot.id);
         if (!res?.ok) { alert(res?.reason || "Upgrade failed"); return; }
 
         syncLevelsFromPlaced();
-        renderBuildPopupForPlot(plot); // immediately refresh to next level
-        centerPanelOnScreen(popup);
+        renderBuildPopupForPlot(plot, { recenter:false });
+        try { saveGame(); } catch {}
         return;
       }
 
@@ -1130,11 +1311,12 @@
         const bKey = el.getAttribute("data-building-id");
         if (!bKey) return;
 
-        const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
+        const r = await placeBuildingCompat(plot.id, bKey);
         if (r && r.ok === false) alert(r.reason || "Could not build.");
 
         syncLevelsFromPlaced();
         popup.style.display = "none";
+        try { saveGame(); } catch {}
         return;
       }
 
@@ -1145,8 +1327,7 @@
 
       if (action === "bx-tab") {
         barracksTab = el.getAttribute("data-tab") || "train";
-        renderBarracksPanel();
-        centerPanelOnScreen(barracksPanel);
+        renderBarracksPanel({ recenter:true });
         return;
       }
 
@@ -1163,8 +1344,7 @@
         const res = startTrainingInSlot({ barracksLevel, slotIndex, troopId, amount });
         if (!res?.ok) alert(res?.reason || "Could not start training.");
 
-        renderBarracksPanel();
-        centerPanelOnScreen(barracksPanel);
+        renderBarracksPanel({ recenter:false });
         return;
       }
 
@@ -1175,8 +1355,7 @@
         const res = cancelTraining?.({ slotIndex, refundPercent: 0.5 });
         if (res && res.ok === false) alert(res.reason || "Could not cancel.");
 
-        renderBarracksPanel();
-        centerPanelOnScreen(barracksPanel);
+        renderBarracksPanel({ recenter:false });
         return;
       }
 
@@ -1184,12 +1363,15 @@
         const barracksPlot = findBarracksPlot();
         if (!barracksPlot) return;
 
-        const r = await buildings.upgradePlot(barracksPlot.id);
+        const st = getStatusCompat(barracksPlot.id);
+        if (st?.constructing || st?.upgrading) return;
+
+        const r = await upgradePlotCompat(barracksPlot.id);
         if (r && r.ok === false) { alert(r.reason || "Upgrade failed."); return; }
 
         syncLevelsFromPlaced();
-        renderBarracksPanel();
-        centerPanelOnScreen(barracksPanel);
+        renderBarracksPanel({ recenter:false });
+        try { saveGame(); } catch {}
         return;
       }
     }
@@ -1201,20 +1383,24 @@
       if (!plot) return;
       if (uiJustHappened()) return;
 
-      const existing = buildings.getPlacedOnPlot(plot.id);
+      // don’t let a plot click happen through settings
+      if (settingsPanel.style.display !== "none") return;
+
+      const existing = buildings.getPlacedOnPlot?.(plot.id);
       const isBarracks = existing?.buildingId === "barracks";
 
       if (isBarracks) {
         popup.style.display = "none";
+        settingsPanel.style.display = "none";
         barracksTab = "train";
         barracksPanel.style.display = "block";
-        renderBarracksPanel();
-        centerPanelOnScreen(barracksPanel);
+        renderBarracksPanel({ recenter:true });
         return;
       }
 
       barracksPanel.style.display = "none";
-      renderBuildPopupForPlot(plot);
+      settingsPanel.style.display = "none";
+      renderBuildPopupForPlot(plot, { recenter:true });
     });
 
     // =========================================================
@@ -1232,6 +1418,7 @@
         <div class="resItem"><b>Ore</b> ${fmt(state.resources.ore)} <span>(+${fmtRate(p.ore)}/s)</span></div>
         <div class="resItem"><b>Gold</b> ${fmt(state.resources.gold)} <span>(+${fmtRate(p.gold)}/s)</span></div>
         <div class="resItem" style="opacity:.9"><b>TH</b> ${state.buildings?.levels?.townhall || 0}</div>
+        <div class="resItem" style="opacity:.85"><b>Timers</b> ${state.settings.timersEnabled ? "ON" : "OFF"}</div>
       `;
     }
 
@@ -1252,15 +1439,27 @@
       syncLevelsFromPlaced();
       const placed = [];
       for (const plot of CITY_PLOTS) {
-        const p = buildings.getPlacedOnPlot(plot.id);
+        const p = buildings.getPlacedOnPlot?.(plot.id);
         if (!p) continue;
-        placed.push({ plotId: plot.id, buildingId: p.buildingId, level: p.level ?? 1 });
+
+        // keep your old format, but include timer fields if present
+        placed.push({
+          plotId: plot.id,
+          buildingId: p.buildingId,
+          level: p.level ?? 1,
+          buildStartedAt: p.buildStartedAt ?? 0,
+          buildEndAt: p.buildEndAt ?? 0,
+          upgradeStartedAt: p.upgradeStartedAt ?? 0,
+          upgradeEndAt: p.upgradeEndAt ?? 0,
+          upgradingToLevel: p.upgradingToLevel ?? 0,
+        });
       }
       return {
         v: 1,
         ts: Date.now(),
         resources: { ...state.resources },
         levels: { ...state.buildings.levels },
+        settings: { ...state.settings },
         placed,
       };
     }
@@ -1310,6 +1509,13 @@
         state.resources.gold  = Number(data.resources.gold  ?? 0);
       }
 
+      if (data.settings && typeof data.settings === "object") {
+        state.settings.timersEnabled = (typeof data.settings.timersEnabled === "boolean")
+          ? data.settings.timersEnabled
+          : state.settings.timersEnabled;
+        syncSettingsUI();
+      }
+
       if (typeof buildings.resetAllPlaced === "function") buildings.resetAllPlaced();
 
       if (Array.isArray(data.placed)) {
@@ -1318,16 +1524,30 @@
           const buildingId = String(rec.buildingId);
           const targetLevel = Math.max(1, Number(rec.level ?? 1));
 
-          await buildings.placeBuildingOnPlot(plotId, buildingId, 1);
+          // place at L1 (may start construction depending on timersEnabled)
+          await placeBuildingCompat(plotId, buildingId);
 
-          for (let lvl = 1; lvl < targetLevel; lvl++) {
-            const r = await buildings.upgradePlot(plotId);
-            if (r && r.ok === false) break;
+          // If save had live timers (buildEndAt/upgradeEndAt), prefer restoring those on the instance if supported
+          const inst = buildings.getPlacedOnPlot?.(plotId);
+          if (inst) {
+            if ("buildEndAt" in inst && rec.buildEndAt) inst.buildEndAt = Number(rec.buildEndAt) || 0;
+            if ("buildStartedAt" in inst && rec.buildStartedAt) inst.buildStartedAt = Number(rec.buildStartedAt) || 0;
+            if ("upgradeEndAt" in inst && rec.upgradeEndAt) inst.upgradeEndAt = Number(rec.upgradeEndAt) || 0;
+            if ("upgradeStartedAt" in inst && rec.upgradeStartedAt) inst.upgradeStartedAt = Number(rec.upgradeStartedAt) || 0;
+            if ("upgradingToLevel" in inst && rec.upgradingToLevel) inst.upgradingToLevel = Number(rec.upgradingToLevel) || 0;
+          }
+
+          // If no live upgrade timer in save, bring to targetLevel by upgrading (respects timers toggle)
+          if (!rec.upgradeEndAt) {
+            for (let lvl = 1; lvl < targetLevel; lvl++) {
+              const r = await upgradePlotCompat(plotId);
+              if (r && r.ok === false) break;
+            }
           }
         }
       }
 
-      await buildings.ensureTownhall("townhall");
+      await buildings.ensureTownhall?.("townhall");
       syncLevelsFromPlaced();
       return true;
     }
@@ -1357,6 +1577,7 @@
       updateUiOverlayRect();
       if (popup.style.display !== "none") centerPanelOnScreen(popup);
       if (barracksPanel.style.display !== "none") centerPanelOnScreen(barracksPanel);
+      if (settingsPanel.style.display !== "none") centerPanelOnScreen(settingsPanel);
     });
 
     // smooth refresh while training
@@ -1369,10 +1590,33 @@
       if (!anyTraining) return;
 
       requestAnimationFrame(() => {
-        renderBarracksPanel();
-        centerPanelOnScreen(barracksPanel);
+        renderBarracksPanel({ recenter:false });
       });
     }, 250);
+
+    // timers tick throttled (keeps UI countdowns fresh without thrashing)
+    let lastTimersTick = 0;
+    function timersFrame(){
+      const now = performance.now();
+      if (now - lastTimersTick < 250) return;
+      lastTimersTick = now;
+
+      const changed = buildings.tick?.() || false;
+
+      // if a panel is open, refresh its countdown text
+      if (popup.style.display !== "none" && currentBuildPlot) {
+        renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
+      }
+      if (barracksPanel.style.display !== "none") {
+        renderBarracksPanel({ recenter:false });
+      }
+
+      if (changed) {
+        syncLevelsFromPlaced();
+        // optional: autosave on timer completion
+        try { saveGame(); } catch {}
+      }
+    }
 
     function frame(){
       scene.update();
@@ -1380,6 +1624,8 @@
 
       processTrainingQueues();
       updateUiOverlayRect();
+
+      timersFrame();
 
       requestAnimationFrame(frame);
     }
