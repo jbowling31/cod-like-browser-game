@@ -12,21 +12,20 @@
       position:fixed; inset:0; width:100%; height:100%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
-      touch-action:none;
+      touch-action:none;      /* pointer gestures on canvas */
       display:block;
     }
 
-    /* ===== UI overlay that is CLIPPED to the visible on-screen map rect ===== */
+    /* UI overlay clipped to visible map rect */
     #uiOverlay{
       position:fixed;
       left:0; top:0;
       width:0; height:0;
       overflow:hidden;
-      pointer-events:none;
+      pointer-events:none; /* default pass-through; panels re-enable */
       z-index:1000;
     }
 
-    /* ============== RESOURCE BAR ============== */
     #resourceBar{
       position:absolute;
       left:0; top:0; right:0;
@@ -49,6 +48,7 @@
       box-shadow:
         0 10px 30px rgba(0,0,0,.35),
         inset 0 -1px 0 rgba(255,255,255,.06);
+      touch-action: manipulation;
     }
 
     #resourceLeft{
@@ -92,10 +92,8 @@
       border-color:rgba(255,255,255,.22);
       transform: translateY(-1px);
     }
-
     #resourceRight button:active{ transform: translateY(0px); }
 
-    /* floating panels container */
     #floatingPanels{
       position:absolute;
       inset:0;
@@ -118,16 +116,13 @@
       box-shadow: 0 14px 40px rgba(0,0,0,.45);
       touch-action: manipulation;
     }
-
-    /* Ensure children receive taps */
-    .uiPanel, .uiPanel * { pointer-events: auto; }
+    .uiPanel, .uiPanel * { pointer-events:auto; }
     .uiPanel button, .uiPanel select, .uiPanel input { touch-action: manipulation; }
 
-    /* build popup */
+    /* Build popup */
     #buildPopup{ display:none; }
     #buildTitle{ font-weight:900; margin-bottom:10px; font-size:14px; }
     #buildGrid{ display:block; }
-
     .buildBtn{
       padding:12px;
       border-radius:14px;
@@ -141,7 +136,6 @@
       width:100%;
       touch-action: manipulation;
     }
-
     .buildBtn:hover{ background:rgba(255,255,255,.16); transform: translateY(-1px); }
     .buildBtn:active{ transform: translateY(0px); }
 
@@ -157,10 +151,10 @@
     }
     .closeBtn:hover{ background:rgba(255,255,255,.16); }
 
-    /* barracks panel */
+    /* Barracks */
     #barracksPanel{ display:none; width:420px; max-height:70vh; overflow:auto; }
 
-    /* ===== Upgrade Card (universal) ===== */
+    /* Upgrade card */
     .upCard{
       background: rgba(0,0,0,.55);
       border: 1px solid rgba(255,255,255,.14);
@@ -188,7 +182,6 @@
       margin: 6px 0;
       opacity: .95;
     }
-
     .upRow b{ font-weight: 900; }
     .upCost{ font-weight: 900; letter-spacing: .3px; }
 
@@ -234,14 +227,8 @@
       background: rgba(0,0,0,.35);
     }
 
-    /* ===== Barracks panel tabs ===== */
-    .bxHeader{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom:10px;
-    }
+    /* Barracks tabs */
+    .bxHeader{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .bxClose{
       padding:9px 12px;
       border-radius:12px;
@@ -252,7 +239,6 @@
       touch-action: manipulation;
     }
     .bxClose:hover{ background:rgba(255,255,255,.16); }
-
     .bxWrap{ display:flex; gap:12px; }
     .bxTabs{
       width:120px;
@@ -304,7 +290,7 @@
         <div id="buildTitle">Build</div>
         <div id="buildGrid"></div>
         <div class="row">
-          <button id="buildClose" class="closeBtn" type="button">Close</button>
+          <button id="buildClose" class="closeBtn" type="button" data-action="build-close">Close</button>
         </div>
       </div>
 
@@ -316,19 +302,13 @@
     // =========================================================
     // 1) IMPORTS
     // =========================================================
-    import { createCityScene } from "./js/cityScene.js";
     import { CITY_PLOTS } from "./js/plots.city.js";
     import { BUILDINGS } from "./js/data/buildingCatalog.js";
     import { createcitybuildingsSystem } from "./js/systems/cityBuildings.js";
     import { state } from "./js/state.js";
     import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
     import { processTrainingQueues } from "./js/systems/trainingsystems.js";
-    import {
-      getTrainingSnapshot,
-      startTrainingInSlot,
-      cancelTraining,
-      syncBarracksSlots
-    } from "./js/systems/trainingsystems.js";
+    import { getTrainingSnapshot, startTrainingInSlot, cancelTraining, syncBarracksSlots } from "./js/systems/trainingsystems.js";
     import { TROOPS, BARRACKS_TIER_UNLOCK } from "./js/data/troopsCatalog.js";
 
     // =========================================================
@@ -340,7 +320,325 @@
     const PENDING_KEY = "EMPIRE_PENDING_LOAD";
 
     // =========================================================
-    // 3) BOOT SCENE + SYSTEMS
+    // 3) PURE POINTER EVENTS CANVAS SCENE (NO touch* listeners)
+    // =========================================================
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+    function loadImage(src){
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function createCityScene(canvas, { baseMapSrc }) {
+      const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+      ctx.imageSmoothingEnabled = false;
+
+      let buildingsSystem = null;
+      let onPlotClick = null;
+
+      let baseImg = null;
+      let baseW = 512, baseH = 512;
+
+      const cam = {
+        x: baseW/2,
+        y: baseH/2,
+        zoom: 2,
+        minZoom: 1,
+        maxZoom: 6
+      };
+
+      const sceneState = {
+        plots: [],
+        selectedPlotId: null,
+      };
+
+      function resizeCanvas(){
+        const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        const r = canvas.getBoundingClientRect();
+        const w = Math.max(1, Math.floor(r.width * dpr));
+        const h = Math.max(1, Math.floor(r.height * dpr));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w; canvas.height = h;
+          ctx.setTransform(1,0,0,1,0,0);
+          ctx.imageSmoothingEnabled = false;
+        }
+      }
+
+      function worldToScreen(wx, wy){
+        const cx = canvas.width/2, cy = canvas.height/2;
+        return { x:(wx-cam.x)*cam.zoom+cx, y:(wy-cam.y)*cam.zoom+cy };
+      }
+
+      function screenToWorld(sx, sy){
+        const cx = canvas.width/2, cy = canvas.height/2;
+        return { x:(sx-cx)/cam.zoom+cam.x, y:(sy-cy)/cam.zoom+cam.y };
+      }
+
+      function clampCameraToMap(){
+        const viewW = canvas.width / cam.zoom;
+        const viewH = canvas.height / cam.zoom;
+
+        if (viewW >= baseW) cam.x = baseW / 2;
+        else {
+          const half = viewW / 2;
+          cam.x = clamp(cam.x, half, baseW - half);
+        }
+
+        if (viewH >= baseH) cam.y = baseH / 2;
+        else {
+          const half = viewH / 2;
+          cam.y = clamp(cam.y, half, baseH - half);
+        }
+      }
+
+      function computeMinZoomToFit(){
+        const zX = canvas.width / baseW;
+        const zY = canvas.height / baseH;
+        return Math.max(zX, zY);
+      }
+
+      function zoomAt(delta, sx, sy){
+        const before = screenToWorld(sx, sy);
+        cam.minZoom = computeMinZoomToFit();
+        cam.zoom = clamp(cam.zoom * delta, cam.minZoom, cam.maxZoom);
+        const after = screenToWorld(sx, sy);
+        cam.x += (before.x - after.x);
+        cam.y += (before.y - after.y);
+        clampCameraToMap();
+      }
+
+      function eventToCanvasXY(e){
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top)  * (canvas.height / rect.height);
+        return { x, y };
+      }
+
+      function pointInRect(px, py, r){
+        return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+      }
+
+      function pickPlot(wx, wy){
+        for (let i = sceneState.plots.length - 1; i >= 0; i--) {
+          const p = sceneState.plots[i];
+          if (pointInRect(wx, wy, p)) return p;
+        }
+        return null;
+      }
+
+      function firePickAtScreen(sx, sy){
+        const w = screenToWorld(sx, sy);
+        const hit = pickPlot(w.x, w.y);
+        sceneState.selectedPlotId = hit ? hit.id : null;
+
+        if (hit && typeof onPlotClick === "function") {
+          const anchorW = { x: hit.x + hit.w/2, y: hit.y + hit.h };
+          const anchorS = worldToScreen(anchorW.x, anchorW.y);
+          onPlotClick(hit, sx, sy, anchorW, anchorS);
+        }
+      }
+
+      // ---- Pointer pan/pinch/tap ----
+      const pointers = new Map(); // pointerId -> {x,y}
+      let isPanning = false;
+      let panStart = { x:0, y:0, camX:0, camY:0 };
+      let down = null; // {x,y,time, moved, multi}
+      let pinchStart = null; // {dist, zoom, mid:{x,y}}
+
+      const TAP_MOVE_PX = 10;
+
+      function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+      function mid(a,b){ return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
+
+      canvas.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const p = eventToCanvasXY(e);
+        const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+        zoomAt(factor, p.x, p.y);
+      }, { passive:false });
+
+      canvas.addEventListener("pointerdown", (e) => {
+        canvas.setPointerCapture(e.pointerId);
+        const p = eventToCanvasXY(e);
+        pointers.set(e.pointerId, p);
+
+        if (pointers.size === 1) {
+          isPanning = true;
+          panStart = { x:p.x, y:p.y, camX:cam.x, camY:cam.y };
+          down = { x:p.x, y:p.y, time:performance.now(), moved:false, multi:false };
+        } else if (pointers.size === 2) {
+          // start pinch
+          const [a,b] = Array.from(pointers.values());
+          pinchStart = {
+            dist: dist(a,b),
+            zoom: cam.zoom,
+            mid: mid(a,b),
+          };
+          if (down) down.multi = true;
+          isPanning = false;
+        } else {
+          if (down) down.multi = true;
+          isPanning = false;
+        }
+      }, { passive:true });
+
+      canvas.addEventListener("pointermove", (e) => {
+        if (!pointers.has(e.pointerId)) return;
+        const p = eventToCanvasXY(e);
+        pointers.set(e.pointerId, p);
+
+        if (pointers.size === 1 && isPanning) {
+          cam.x = panStart.camX - (p.x - panStart.x) / cam.zoom;
+          cam.y = panStart.camY - (p.y - panStart.y) / cam.zoom;
+          clampCameraToMap();
+
+          if (down && !down.moved) {
+            if (Math.hypot(p.x-down.x, p.y-down.y) > TAP_MOVE_PX) down.moved = true;
+          }
+        } else if (pointers.size === 2 && pinchStart) {
+          const [a,b] = Array.from(pointers.values());
+          const d = dist(a,b);
+          const scale = pinchStart.dist ? (d / pinchStart.dist) : 1;
+
+          const before = screenToWorld(pinchStart.mid.x, pinchStart.mid.y);
+          cam.minZoom = computeMinZoomToFit();
+          cam.zoom = clamp(pinchStart.zoom * scale, cam.minZoom, cam.maxZoom);
+          const after = screenToWorld(pinchStart.mid.x, pinchStart.mid.y);
+
+          cam.x += (before.x - after.x);
+          cam.y += (before.y - after.y);
+          clampCameraToMap();
+
+          if (down) down.multi = true;
+        }
+      }, { passive:true });
+
+      canvas.addEventListener("pointerup", (e) => {
+        const p = eventToCanvasXY(e);
+        pointers.delete(e.pointerId);
+
+        const wasTap = down && !down.moved && !down.multi;
+        const recent = down && (performance.now() - down.time) < 650;
+
+        if (wasTap && recent) {
+          firePickAtScreen(p.x, p.y);
+        }
+
+        if (pointers.size === 1) {
+          // if one pointer remains, resume pan from its position
+          const only = Array.from(pointers.values())[0];
+          isPanning = true;
+          panStart = { x: only.x, y: only.y, camX: cam.x, camY: cam.y };
+        } else {
+          isPanning = false;
+          pinchStart = null;
+        }
+
+        down = null;
+      }, { passive:true });
+
+      canvas.addEventListener("pointercancel", (e) => {
+        pointers.delete(e.pointerId);
+        isPanning = false;
+        pinchStart = null;
+        down = null;
+      }, { passive:true });
+
+      async function init(){
+        resizeCanvas();
+        baseImg = await loadImage(baseMapSrc);
+        baseW = baseImg.width; baseH = baseImg.height;
+
+        cam.x = baseW/2; cam.y = baseH/2;
+        cam.minZoom = computeMinZoomToFit();
+        cam.zoom = Math.max(cam.zoom, cam.minZoom);
+        clampCameraToMap();
+      }
+      init().catch(err => console.error("City init failed:", err));
+
+      function drawBase(){
+        const cx = canvas.width/2, cy = canvas.height/2;
+
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.fillStyle = "#0f1220";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+
+        ctx.setTransform(cam.zoom, 0, 0, cam.zoom, cx - cam.x*cam.zoom, cy - cam.y*cam.zoom);
+        ctx.imageSmoothingEnabled = false;
+
+        if (baseImg) ctx.drawImage(baseImg, 0, 0);
+      }
+
+      function drawPlacedBuildings() {
+        if (!buildingsSystem) return;
+        const placed = buildingsSystem.getAllPlaced?.() || [];
+        if (!placed.length) return;
+
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        ctx.setTransform(cam.zoom, 0, 0, cam.zoom, cx - cam.x * cam.zoom, cy - cam.y * cam.zoom);
+        ctx.imageSmoothingEnabled = false;
+
+        for (const b of placed) {
+          const plot = sceneState.plots.find(p => p.id === b.plotId);
+          if (!plot) continue;
+
+          const ax = plot.x + plot.w / 2;
+          const ay = plot.y + plot.h;
+
+          ctx.drawImage(
+            b.img,
+            Math.round(ax - b.w / 2),
+            Math.round(ay - b.h),
+            b.w,
+            b.h
+          );
+        }
+      }
+
+      function drawPlotsOverlay(){
+        ctx.setTransform(1,0,0,1,0,0);
+
+        for (const p of sceneState.plots) {
+          const a = worldToScreen(p.x, p.y);
+          const b = worldToScreen(p.x+p.w, p.y+p.h);
+
+          const x = Math.min(a.x,b.x), y = Math.min(a.y,b.y);
+          const w = Math.abs(b.x-a.x), h = Math.abs(b.y-a.y);
+
+          const sel = p.id === sceneState.selectedPlotId;
+          ctx.lineWidth = sel ? 3 : 2;
+          ctx.strokeStyle = sel ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)";
+          ctx.strokeRect(x,y,w,h);
+
+          if (sel) {
+            ctx.fillStyle = "rgba(255,255,255,0.08)";
+            ctx.fillRect(x,y,w,h);
+          }
+        }
+      }
+
+      return {
+        setPlots(plots){ sceneState.plots = plots; },
+        setBuildingsSystem(sys){ buildingsSystem = sys; },
+        setOnPlotClick(fn){ onPlotClick = fn; },
+
+        update(){ resizeCanvas(); cam.minZoom = computeMinZoomToFit(); clampCameraToMap(); },
+        render(){ drawBase(); drawPlacedBuildings(); drawPlotsOverlay(); },
+
+        worldToScreen,
+        getMapWidth(){ return baseW; },
+        getMapHeight(){ return baseH; },
+        getCamera(){ return { ...cam }; }
+      };
+    }
+
+    // =========================================================
+    // 4) BOOT SCENE + SYSTEMS
     // =========================================================
     const canvas = document.getElementById("cityCanvas");
     const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC });
@@ -353,47 +651,56 @@
     if (!hasPendingLoad) await buildings.ensureTownhall("townhall");
 
     // =========================================================
-    // 4) UI OVERLAY RECT (map -> css px)
+    // 5) UI OVERLAY RECT (map -> css px)
     // =========================================================
     const uiOverlay = document.getElementById("uiOverlay");
     const resourceBar = document.getElementById("resourceBar");
     const resourceLeft = document.getElementById("resourceLeft");
 
-    const clamp = (v, a, b) => {
+    const popup = document.getElementById("buildPopup");
+    const buildTitle = document.getElementById("buildTitle");
+    const buildGrid = document.getElementById("buildGrid");
+
+    const barracksPanel = document.getElementById("barracksPanel");
+
+    let currentBuildPlot = null;
+    let barracksTab = "train";
+
+    const clampNum = (v, a, b) => {
       v = Number(v);
       if (!Number.isFinite(v)) return a;
       return Math.max(a, Math.min(b, v));
     };
 
-    function getMapSizeSafe() {
+    function getMapSizeSafe(){
       const w = (typeof scene.getMapWidth === "function") ? scene.getMapWidth() : 512;
       const h = (typeof scene.getMapHeight === "function") ? scene.getMapHeight() : 512;
       return { w, h };
     }
 
-    function worldToScreenSafe(wx, wy) {
+    function worldToScreenSafe(wx, wy){
       if (typeof scene.worldToScreen === "function") return scene.worldToScreen(wx, wy);
       return { x: wx, y: wy };
     }
 
-    function canvasPxToCssPage(canvasPxX, canvasPxY) {
+    function canvasPxToCssPage(canvasPxX, canvasPxY){
       const r = canvas.getBoundingClientRect();
       return {
         x: r.left + (canvasPxX / canvas.width) * r.width,
-        y: r.top + (canvasPxY / canvas.height) * r.height
+        y: r.top  + (canvasPxY / canvas.height) * r.height
       };
     }
 
-    function updateUiOverlayRect() {
+    function updateUiOverlayRect(){
       const { w: mapW, h: mapH } = getMapSizeSafe();
       const a = worldToScreenSafe(0, 0);
       const b = worldToScreenSafe(mapW, mapH);
       const A = canvasPxToCssPage(a.x, a.y);
       const B = canvasPxToCssPage(b.x, b.y);
 
-      const left = Math.min(A.x, B.x);
-      const top = Math.min(A.y, B.y);
-      const right = Math.max(A.x, B.x);
+      const left   = Math.min(A.x, B.x);
+      const top    = Math.min(A.y, B.y);
+      const right  = Math.max(A.x, B.x);
       const bottom = Math.max(A.y, B.y);
 
       uiOverlay.style.left = `${left}px`;
@@ -403,43 +710,16 @@
     }
 
     // =========================================================
-    // 5) iOS SAFARI: UI EVENT SHIELD (BUBBLE PHASE)
+    // 6) PANEL PLACEMENT (CENTER ONLY ON OPEN/RESIZE)
     // =========================================================
-    function shieldUiFromCanvas(uiRoot) {
-      if (!uiRoot) return;
-
-      const isUiTarget = (e) => !!e.target?.closest?.("#resourceBar, .uiPanel");
-
-      const stopBubble = (e) => {
-        if (!isUiTarget(e)) return;
-        e.stopPropagation();
-      };
-
-      const stopUiScroll = (e) => {
-        if (!isUiTarget(e)) return;
-        e.preventDefault();
-      };
-
-      ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach((type) => {
-        uiRoot.addEventListener(type, stopBubble);
-      });
-
-      uiRoot.addEventListener("touchmove", stopUiScroll, { passive: false });
-    }
-
-    shieldUiFromCanvas(uiOverlay);
-
-    // =========================================================
-    // 6) PLACEMENT HELPERS (CENTER PANELS ON SCREEN)
-    // =========================================================
-    function centerPanelOnScreen(panelEl) {
+    function centerPanelOnScreen(panelEl){
       const r = canvas.getBoundingClientRect();
       const overlayRect = uiOverlay.getBoundingClientRect();
 
       panelEl.style.display = "block";
       panelEl.style.visibility = "hidden";
       panelEl.style.left = "0px";
-      panelEl.style.top = "0px";
+      panelEl.style.top  = "0px";
 
       const pw = panelEl.offsetWidth;
       const ph = panelEl.offsetHeight;
@@ -447,65 +727,93 @@
       panelEl.style.visibility = "visible";
 
       const targetPageX = r.left + r.width / 2;
-      const targetPageY = r.top + r.height / 2;
+      const targetPageY = r.top  + r.height / 2;
 
       const localX = targetPageX - overlayRect.left - pw / 2;
-      const localY = targetPageY - overlayRect.top - ph / 2;
+      const localY = targetPageY - overlayRect.top  - ph / 2;
 
       const pad = 12;
       const barH = resourceBar.offsetHeight || 64;
 
-      const x = clamp(localX, pad, Math.max(pad, overlayRect.width - pw - pad));
-      const y = clamp(localY, pad + barH, Math.max(pad + barH, overlayRect.height - ph - pad));
+      const x = clampNum(localX, pad, Math.max(pad, overlayRect.width - pw - pad));
+      const y = clampNum(localY, pad + barH, Math.max(pad + barH, overlayRect.height - ph - pad));
 
       panelEl.style.left = `${x}px`;
-      panelEl.style.top = `${y}px`;
+      panelEl.style.top  = `${y}px`;
     }
 
     // =========================================================
-    // 7) TAP BINDER (iOS-safe)
+    // 7) iOS GHOST TAP / DOUBLE FIRE PROTECTION
     // =========================================================
-    function bindTap(el, fn) {
-      if (!el) return;
+    let lastUiActionAt = 0;
+    function markUiAction(){ lastUiActionAt = performance.now(); }
+    function uiJustHappened(ms = 450){ return (performance.now() - lastUiActionAt) < ms; }
 
-      const run = async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        await fn(e);
-      };
+    // Delegated UI handler uses capture phase to block canvas, and handles action itself.
+    let lastDelegatedFire = 0;
 
-      el.addEventListener("pointerup", run, { passive: false });
-      el.addEventListener("touchend", run, { passive: false });
+    function isUiTargetEvent(e){
+      return !!e.target?.closest?.("#resourceBar, .uiPanel");
     }
 
+    uiOverlay.addEventListener("pointerdown", (e) => {
+      if (!isUiTargetEvent(e)) return;
+      markUiAction();
+      e.stopPropagation();
+    }, { capture:true, passive:true });
+
+    uiOverlay.addEventListener("pointerup", async (e) => {
+      if (!isUiTargetEvent(e)) return;
+
+      // dedupe fast double pointer events
+      const now = performance.now();
+      if (now - lastDelegatedFire < 250) return;
+      lastDelegatedFire = now;
+
+      markUiAction();
+      e.preventDefault();
+      e.stopPropagation();
+
+      const btn = e.target?.closest?.("[data-action]");
+      if (!btn) return;
+
+      const action = btn.getAttribute("data-action");
+
+      try {
+        await handleUiAction(action, btn);
+      } catch (err) {
+        console.error("UI action failed:", action, err);
+      }
+    }, { capture:true, passive:false });
+
     // =========================================================
-    // 8) COST HELPERS
+    // 8) COST + ECON HELPERS
     // =========================================================
     function fmtCost(cost) {
       if (!cost) return "";
       const parts = [];
-      if (cost.food) parts.push(`F:${cost.food}`);
-      if (cost.wood) parts.push(`W:${cost.wood}`);
+      if (cost.food)  parts.push(`F:${cost.food}`);
+      if (cost.wood)  parts.push(`W:${cost.wood}`);
       if (cost.stone) parts.push(`S:${cost.stone}`);
-      if (cost.ore) parts.push(`O:${cost.ore}`);
-      if (cost.gold) parts.push(`G:${cost.gold}`);
+      if (cost.ore)   parts.push(`O:${cost.ore}`);
+      if (cost.gold)  parts.push(`G:${cost.gold}`);
       return parts.length ? parts.join(" ") : "";
     }
 
-    function fmtCostPretty(cost) {
+    function fmtCostPretty(cost){
       if (!cost) return "?";
       const parts = [];
-      if (cost.food) parts.push(`F:${cost.food}`);
-      if (cost.wood) parts.push(`W:${cost.wood}`);
+      if (cost.food)  parts.push(`F:${cost.food}`);
+      if (cost.wood)  parts.push(`W:${cost.wood}`);
       if (cost.stone) parts.push(`S:${cost.stone}`);
-      if (cost.ore) parts.push(`O:${cost.ore}`);
-      if (cost.gold) parts.push(`G:${cost.gold}`);
+      if (cost.ore)   parts.push(`O:${cost.ore}`);
+      if (cost.gold)  parts.push(`G:${cost.gold}`);
       return parts.length ? parts.join("  ") : "?";
     }
 
     function isResourceUnlocked(res) {
       if (res === "stone") return !!buildings.getByBuildingId?.("quarry");
-      if (res === "ore") return !!buildings.getByBuildingId?.("mine");
+      if (res === "ore")   return !!buildings.getByBuildingId?.("mine");
       return true;
     }
 
@@ -521,16 +829,8 @@
     }
 
     // =========================================================
-    // 9) BUILD POPUP
+    // 9) STATE SYNC FROM BUILDINGS PLACED
     // =========================================================
-    const popup = document.getElementById("buildPopup");
-    const buildTitle = document.getElementById("buildTitle");
-    const buildGrid = document.getElementById("buildGrid");
-    const buildClose = document.getElementById("buildClose");
-
-    bindTap(buildClose, async () => { popup.style.display = "none"; });
-    popup.style.display = "none";
-
     function syncLevelsFromPlaced() {
       const lv = (state.buildings.levels ||= {});
       lv.townhall = 0;
@@ -552,13 +852,16 @@
       state.buildings.townhallLevel = lv.townhall || 0;
     }
 
-    function openBuildPopup(plot) {
+    // =========================================================
+    // 10) BUILD POPUP RENDER (NO per-button listeners)
+    // =========================================================
+    function renderBuildPopupForPlot(plot){
+      currentBuildPlot = plot;
       const existing = buildings.getPlacedOnPlot(plot.id);
+
       buildGrid.innerHTML = "";
 
       if (existing) {
-        buildTitle.textContent = `Plot: ${plot.id} (Occupied)`;
-
         const lvl = existing.level ?? 1;
         const def = BUILDINGS[existing.buildingId];
         const name = def?.name || existing.buildingId;
@@ -566,23 +869,18 @@
         const chk = buildings.canUpgradePlot(plot.id);
         const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
         const affordable = canAfford(upgradeCost);
+        const disabled = (!chk.ok || !affordable || !upgradeCost);
+
+        buildTitle.textContent = `Plot: ${plot.id} (Occupied)`;
 
         buildGrid.innerHTML = `
           <div class="upCard">
             <div class="upTitle">${name}</div>
 
-            <div class="upRow">
-              <span>Current Level</span>
-              <b>${lvl}</b>
-            </div>
+            <div class="upRow"><span>Current Level</span><b>${lvl}</b></div>
+            <div class="upRow"><span>Cost</span><span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
 
-            <div class="upRow">
-              <span>Cost</span>
-              <span class="upCost">${fmtCostPretty(upgradeCost)}</span>
-            </div>
-
-            <button id="btnUpgrade" class="upBtn"
-              ${(!chk.ok || !affordable || !upgradeCost) ? "disabled" : ""}>
+            <button class="upBtn" type="button" data-action="build-upgrade" ${disabled ? "disabled" : ""}>
               Upgrade → Lv ${lvl + 1}
             </button>
 
@@ -590,56 +888,38 @@
             ${(chk.ok && upgradeCost && !affordable) ? `<div class="upReason">Not enough resources</div>` : ""}
           </div>
         `;
+      } else {
+        buildTitle.textContent = `Plot: ${plot.id} (Build)`;
 
-        const upBtn = buildGrid.querySelector("#btnUpgrade");
-        if (upBtn && !upBtn.disabled) {
-          bindTap(upBtn, async () => {
-            const res = await buildings.upgradePlot(plot.id);
-            if (!res?.ok) {
-              alert(res?.reason || "Upgrade failed");
-              return;
-            }
-            syncLevelsFromPlaced();
-            openBuildPopup(plot);
-            centerPanelOnScreen(popup);
-          });
+        const frag = document.createDocumentFragment();
+
+        for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")) {
+          const def = BUILDINGS[bKey];
+          const cost = def?.cost || null;
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "buildBtn";
+          btn.setAttribute("data-action", "build-place");
+          btn.setAttribute("data-building-id", bKey);
+          btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCost(cost)}` : ""}`;
+
+          const gate = buildings.canBuildBuilding?.(bKey) ?? { ok:true };
+
+          if (!gate.ok) {
+            btn.disabled = true;
+            btn.style.opacity = "0.35";
+            btn.title = gate.reason;
+          } else if (cost && !canAfford(cost)) {
+            btn.disabled = true;
+            btn.style.opacity = "0.35";
+            btn.title = "Not enough resources";
+          }
+
+          frag.appendChild(btn);
         }
 
-        popup.style.display = "block";
-        centerPanelOnScreen(popup);
-        return;
-      }
-
-      buildTitle.textContent = `Plot: ${plot.id} (Build)`;
-      for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")) {
-        const def = BUILDINGS[bKey];
-        const cost = def?.cost || null;
-
-        const btn = document.createElement("button");
-        btn.className = "buildBtn";
-        btn.type = "button";
-        btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCost(cost)}` : ""}`;
-
-        const gate = buildings.canBuildBuilding?.(bKey) ?? { ok: true };
-
-        if (!gate.ok) {
-          btn.disabled = true;
-          btn.style.opacity = "0.35";
-          btn.title = gate.reason;
-        } else if (cost && !canAfford(cost)) {
-          btn.disabled = true;
-          btn.style.opacity = "0.35";
-          btn.title = "Not enough resources";
-        } else {
-          bindTap(btn, async () => {
-            const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
-            if (r && r.ok === false) alert(r.reason || "Could not build.");
-            syncLevelsFromPlaced();
-            popup.style.display = "none";
-          });
-        }
-
-        buildGrid.appendChild(btn);
+        buildGrid.appendChild(frag);
       }
 
       popup.style.display = "block";
@@ -647,14 +927,8 @@
     }
 
     // =========================================================
-    // 10) BARRACKS PANEL
+    // 11) BARRACKS PANEL RENDER (delegation-ready)
     // =========================================================
-    const barracksPanel = document.getElementById("barracksPanel");
-    barracksPanel.style.display = "none";
-
-    let barracksTab = "train";
-    let barracksRafPending = false;
-
     function fmtMMSS(ms) {
       const total = Math.max(0, Math.ceil(ms / 1000));
       const m = Math.floor(total / 60);
@@ -681,11 +955,11 @@
       return Number(state?.buildings?.levels?.barracks || 0);
     }
 
-    function findBarracksPlot() {
+    function findBarracksPlot(){
       return CITY_PLOTS.find(p => buildings.getPlacedOnPlot(p.id)?.buildingId === "barracks") || null;
     }
 
-    function normalizeSlots(snap) {
+    function normalizeSlots(snap){
       let slots = snap?.slots ?? snap?.items ?? snap?.queue ?? snap?.queues?.barracks ?? snap?.queues;
       if (!Array.isArray(slots)) slots = slots ? Object.values(slots).flat() : [];
       return slots.map((s) => {
@@ -701,7 +975,7 @@
       });
     }
 
-    function renderBarracksPanel() {
+    function renderBarracksPanel(){
       const barracksLevel = getBarracksLevelSafe();
       try { syncBarracksSlots?.(barracksLevel); } catch {}
 
@@ -733,7 +1007,7 @@
                   border-radius:12px; padding:10px;" />
               </div>
 
-              <button data-slot="${i}" data-role="start"
+              <button type="button" data-action="bx-start" data-slot="${i}"
                 style="margin-top:10px; width:100%; background:#2563eb; color:white; border:0;
                 border-radius:12px; padding:12px; font-weight:900; cursor:pointer; touch-action:manipulation;">
                 Train
@@ -759,7 +1033,7 @@
               <span>${Math.round(pct)}%</span>
             </div>
 
-            <button data-slot="${i}" data-role="cancel"
+            <button type="button" data-action="bx-cancel" data-slot="${i}"
               style="margin-top:10px; width:100%; background:rgba(239,68,68,.95); color:white; border:0;
               border-radius:12px; padding:12px; font-weight:900; cursor:pointer; touch-action:manipulation;">
               Cancel
@@ -786,16 +1060,14 @@
             <div class="upRow"><span>Current Level:</span> <b>${lvl}</b></div>
             <div class="upRow"><span>Cost:</span> <span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
 
-            <button id="bxUpgradeBtn" class="upBtn" ${disabled ? "disabled" : ""}>
+            <button type="button" class="upBtn" data-action="bx-upgrade" ${disabled ? "disabled" : ""}>
               Upgrade → Lv ${lvl+1}
             </button>
 
             ${(!chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
             ${(chk.ok && upgradeCost && !affordable ? `<div class="upReason">Not enough resources</div>` : "")}
 
-            <div class="upHint">
-              Tiers unlock by Barracks level: L1=T1, L5=T2, L10=T3, L15=T4
-            </div>
+            <div class="upHint">Tiers unlock: L1=T1, L5=T2, L10=T3, L15=T4</div>
           </div>
         `;
       }
@@ -806,13 +1078,13 @@
             <div style="font-size:14px;font-weight:900;">Barracks</div>
             <div style="opacity:.7;margin-top:2px;">L${barracksLevel}</div>
           </div>
-          <button id="barracksCloseBtn" class="bxClose" type="button">Close</button>
+          <button id="barracksCloseBtn" class="bxClose" type="button" data-action="bx-close">Close</button>
         </div>
 
         <div class="bxWrap">
           <div class="bxTabs">
-            <button class="bxTab ${barracksTab==="train"?"active":""}" data-tab="train" type="button">Train</button>
-            <button class="bxTab ${barracksTab==="upgrade"?"active":""}" data-tab="upgrade" type="button">Upgrade</button>
+            <button class="bxTab ${barracksTab==="train"?"active":""}" data-action="bx-tab" data-tab="train" type="button">Train</button>
+            <button class="bxTab ${barracksTab==="upgrade"?"active":""}" data-action="bx-tab" data-tab="upgrade" type="button">Upgrade</button>
           </div>
 
           <div class="bxMain">
@@ -827,79 +1099,107 @@
           </div>
         </div>
       `;
+    }
 
-      const closeBtn = barracksPanel.querySelector("#barracksCloseBtn");
-      bindTap(closeBtn, async () => { barracksPanel.style.display = "none"; });
+    // =========================================================
+    // 12) UI ACTION ROUTER (EVENT DELEGATION)
+    // =========================================================
+    async function handleUiAction(action, el){
+      if (action === "build-close") {
+        popup.style.display = "none";
+        return;
+      }
 
-      barracksPanel.querySelectorAll(".bxTab").forEach(btn => {
-        bindTap(btn, async () => {
-          barracksTab = btn.getAttribute("data-tab");
-          renderBarracksPanel();
-          centerPanelOnScreen(barracksPanel);
-        });
-      });
+      if (action === "build-upgrade") {
+        const plot = currentBuildPlot;
+        if (!plot) return;
 
-      barracksPanel.querySelectorAll("button[data-role='start']").forEach(btn => {
-        bindTap(btn, async () => {
-          const slotIndex = Number(btn.getAttribute("data-slot"));
-          const troopSel = barracksPanel.querySelector(`select[data-slot="${slotIndex}"][data-role="troop"]`);
-          const amtInp  = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
-          const troopId = troopSel?.value;
-          const amount = Math.max(1, Number(amtInp?.value || 1));
-          if (!troopId) return alert("No troop selected / unlocked.");
-          const res = startTrainingInSlot({ barracksLevel, slotIndex, troopId, amount });
-          if (!res?.ok) alert(res?.reason || "Could not start training.");
-          renderBarracksPanel();
-          centerPanelOnScreen(barracksPanel);
-        });
-      });
+        const res = await buildings.upgradePlot(plot.id);
+        if (!res?.ok) { alert(res?.reason || "Upgrade failed"); return; }
 
-      barracksPanel.querySelectorAll("button[data-role='cancel']").forEach(btn => {
-        bindTap(btn, async () => {
-          const slotIndex = Number(btn.getAttribute("data-slot"));
-          if (!confirm("Cancel this training slot?")) return;
-          const res = cancelTraining?.({ slotIndex, refundPercent: 0.5 });
-          if (res && res.ok === false) alert(res.reason || "Could not cancel.");
-          renderBarracksPanel();
-          centerPanelOnScreen(barracksPanel);
-        });
-      });
+        syncLevelsFromPlaced();
+        renderBuildPopupForPlot(plot); // immediately refresh to next level
+        centerPanelOnScreen(popup);
+        return;
+      }
 
-      const up = barracksPanel.querySelector("#bxUpgradeBtn");
-      if (up && barracksPlot && !up.disabled) {
-        bindTap(up, async () => {
-          const r = await buildings.upgradePlot(barracksPlot.id);
-          if (r && r.ok === false) { alert(r.reason || "Upgrade failed."); return; }
-          syncLevelsFromPlaced();
-          renderBarracksPanel();
-          centerPanelOnScreen(barracksPanel);
-        });
+      if (action === "build-place") {
+        const plot = currentBuildPlot;
+        if (!plot) return;
+
+        const bKey = el.getAttribute("data-building-id");
+        if (!bKey) return;
+
+        const r = await buildings.placeBuildingOnPlot(plot.id, bKey, 1);
+        if (r && r.ok === false) alert(r.reason || "Could not build.");
+
+        syncLevelsFromPlaced();
+        popup.style.display = "none";
+        return;
+      }
+
+      if (action === "bx-close") {
+        barracksPanel.style.display = "none";
+        return;
+      }
+
+      if (action === "bx-tab") {
+        barracksTab = el.getAttribute("data-tab") || "train";
+        renderBarracksPanel();
+        centerPanelOnScreen(barracksPanel);
+        return;
+      }
+
+      if (action === "bx-start") {
+        const barracksLevel = getBarracksLevelSafe();
+        const slotIndex = Number(el.getAttribute("data-slot"));
+        const troopSel = barracksPanel.querySelector(`select[data-slot="${slotIndex}"][data-role="troop"]`);
+        const amtInp  = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
+
+        const troopId = troopSel?.value;
+        const amount = Math.max(1, Number(amtInp?.value || 1));
+        if (!troopId) return alert("No troop selected / unlocked.");
+
+        const res = startTrainingInSlot({ barracksLevel, slotIndex, troopId, amount });
+        if (!res?.ok) alert(res?.reason || "Could not start training.");
+
+        renderBarracksPanel();
+        centerPanelOnScreen(barracksPanel);
+        return;
+      }
+
+      if (action === "bx-cancel") {
+        const slotIndex = Number(el.getAttribute("data-slot"));
+        if (!confirm("Cancel this training slot?")) return;
+
+        const res = cancelTraining?.({ slotIndex, refundPercent: 0.5 });
+        if (res && res.ok === false) alert(res.reason || "Could not cancel.");
+
+        renderBarracksPanel();
+        centerPanelOnScreen(barracksPanel);
+        return;
+      }
+
+      if (action === "bx-upgrade") {
+        const barracksPlot = findBarracksPlot();
+        if (!barracksPlot) return;
+
+        const r = await buildings.upgradePlot(barracksPlot.id);
+        if (r && r.ok === false) { alert(r.reason || "Upgrade failed."); return; }
+
+        syncLevelsFromPlaced();
+        renderBarracksPanel();
+        centerPanelOnScreen(barracksPanel);
+        return;
       }
     }
 
-    // smooth refresh while training
-    setInterval(() => {
-      if (barracksPanel.style.display === "none") return;
-
-      const snap = getTrainingSnapshot?.("barracks") ?? {};
-      const slots = normalizeSlots(snap);
-      const anyTraining = slots.some(s => s.status === "training");
-      if (!anyTraining) return;
-
-      if (barracksRafPending) return;
-      barracksRafPending = true;
-      requestAnimationFrame(() => {
-        barracksRafPending = false;
-        renderBarracksPanel();
-        centerPanelOnScreen(barracksPanel);
-      });
-    }, 250);
-
     // =========================================================
-    // 11) CLICK BEHAVIOR
+    // 13) PLOT CLICK BEHAVIOR (BLOCK IMMEDIATELY AFTER UI TAPS)
     // =========================================================
     scene.setOnPlotClick((plot) => {
       if (!plot) return;
+      if (uiJustHappened()) return;
 
       const existing = buildings.getPlacedOnPlot(plot.id);
       const isBarracks = existing?.buildingId === "barracks";
@@ -914,16 +1214,16 @@
       }
 
       barracksPanel.style.display = "none";
-      openBuildPopup(plot);
+      renderBuildPopupForPlot(plot);
     });
 
     // =========================================================
-    // 12) ECONOMY + RESOURCE BAR
+    // 14) ECONOMY + RESOURCE BAR
     // =========================================================
     const fmt = (n) => Math.floor(n || 0).toLocaleString();
     const fmtRate = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString();
 
-    function renderResourceBar() {
+    function renderResourceBar(){
       const p = getProductionPerSecond();
       resourceLeft.innerHTML = `
         <div class="resItem"><b>Food</b> ${fmt(state.resources.food)} <span>(+${fmtRate(p.food)}/s)</span></div>
@@ -936,7 +1236,7 @@
     }
 
     let econLast = 0;
-    function economyFrame(t) {
+    function economyFrame(t){
       const dt = econLast ? (t - econLast) / 1000 : 0;
       econLast = t;
       updateEconomy(dt);
@@ -946,7 +1246,7 @@
     requestAnimationFrame(economyFrame);
 
     // =========================================================
-    // 13) SAVE / LOAD
+    // 15) SAVE / LOAD
     // =========================================================
     function buildSavePayload() {
       syncLevelsFromPlaced();
@@ -1048,11 +1348,10 @@
     document.getElementById("btnSave").onclick = saveGame;
     document.getElementById("btnLoad").onclick = loadGame;
     document.getElementById("btnReset").onclick = resetSave;
-
     setInterval(() => { try { saveGame(); } catch {} }, 10000);
 
     // =========================================================
-    // 14) MAIN LOOP (NO PER-FRAME RECENTERING)
+    // 16) MAIN LOOP
     // =========================================================
     window.addEventListener("resize", () => {
       updateUiOverlayRect();
@@ -1060,7 +1359,22 @@
       if (barracksPanel.style.display !== "none") centerPanelOnScreen(barracksPanel);
     });
 
-    function frame() {
+    // smooth refresh while training
+    setInterval(() => {
+      if (barracksPanel.style.display === "none") return;
+
+      const snap = getTrainingSnapshot?.("barracks") ?? {};
+      const slots = normalizeSlots(snap);
+      const anyTraining = slots.some(s => s.status === "training");
+      if (!anyTraining) return;
+
+      requestAnimationFrame(() => {
+        renderBarracksPanel();
+        centerPanelOnScreen(barracksPanel);
+      });
+    }, 250);
+
+    function frame(){
       scene.update();
       scene.render();
 
