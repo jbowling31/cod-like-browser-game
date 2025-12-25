@@ -19,6 +19,9 @@ export function tierKeyForLevel(level) {
 
 // "Maintain L1 if no L5 or higher available"
 export async function loadBuildingSprite({ basePath, fileBase, level }) {
+  if (!basePath) throw new Error(`loadBuildingSprite: missing basePath`);
+  if (!fileBase) throw new Error(`loadBuildingSprite: missing fileBase`);
+
   const desired = tierKeyForLevel(level);
   const tryKeys = [desired, "L1"];
 
@@ -27,7 +30,9 @@ export async function loadBuildingSprite({ basePath, fileBase, level }) {
     try {
       const img = await loadImage(src);
       return { img, src, keyUsed: key };
-    } catch {}
+    } catch {
+      // try next
+    }
   }
 
   throw new Error(`No sprite found for ${fileBase} (tried ${desired} and L1)`);

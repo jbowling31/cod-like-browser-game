@@ -3,12 +3,13 @@
 export const LEVEL_KEYS = ["L1", "L5", "L10", "L15", "L20"];
 
 /**
+ * Old rules (restored):
+ * - Buildings unlock by Town Hall level via `minTownhallLevel`.
+ * - Town Hall upgrade requires all built buildings upgraded to current TH level (handled in cityBuildings.js).
+ *
  * Notes:
  * - `cost` is the cost to PLACE at level 1.
- * - `upgradeCost(currentLevel)` returns the cost to go from currentLevel -> currentLevel+1.
- *
- * Progression rule:
- * - Do NOT require stone/ore until Quarry/Mine are realistically available.
+ * - `upgradeCost(level)` returns the cost to go from level -> level+1.
  */
 export const BUILDINGS = {
   townhall: {
@@ -16,19 +17,23 @@ export const BUILDINGS = {
     name: "Town Hall",
     fileBase: "townhall",
     cost: { wood: 0, gold: 0 },
-
     // No stone required until upgrading TH5 -> TH6 (upgradeCost(5))
     upgradeCost: (level) => ({
       wood: 100 * level,
       gold: 60 * level,
       stone: level >= 5 ? 80 * level : 0,
     }),
+    // Optional art sizing defaults (can be overridden in cityBuildings.js too)
+    w: 64,
+    h: 64,
   },
 
+  // Unlocks at TH2
   farm: {
     id: "farm",
     name: "Farm",
     fileBase: "farm",
+    minTownhallLevel: 1,
     cost: { wood: 60, gold: 10 },
     upgradeCost: (level) => ({
       wood: 40 * level,
@@ -36,10 +41,12 @@ export const BUILDINGS = {
     }),
   },
 
+  // Unlocks at TH3
   lumber: {
     id: "lumber",
     name: "Lumber Yard",
     fileBase: "lumber",
+    minTownhallLevel: 1,
     cost: { wood: 40, gold: 10 },
     upgradeCost: (level) => ({
       wood: 30 * level,
@@ -47,44 +54,13 @@ export const BUILDINGS = {
     }),
   },
 
-  quarry: {
-    id: "quarry",
-    name: "Quarry",
-    fileBase: "quarry",
-    cost: { wood: 80, gold: 25 },
-
-    // Quarry is the source of stone, so requiring stone for upgrades is OK.
-    // First upgrade (L1->L2) will require stone, but by then it should have produced some.
-    upgradeCost: (level) => ({
-      wood: 30 * level,
-      stone: 20 * level,
-      gold: 10 * level,
-    }),
-  },
-
-  mine: {
-    id: "mine",
-    name: "Mine",
-    fileBase: "mine",
-
-    // IMPORTANT: Don't require stone to PLACE the mine if it appears soon after quarry unlock.
-    // If you want it to require stone later, add it to upgradeCost (not placement).
-    cost: { wood: 120, gold: 40 },
-
-    upgradeCost: (level) => ({
-      wood: 40 * level,
-      stone: 30 * level,
-      gold: 20 * level,
-    }),
-  },
-
+  // Unlocks at TH4
   barracks: {
     id: "barracks",
     name: "Barracks",
     fileBase: "barracks",
     unique: true,
-
-    // Barracks unlocks before Quarry (in your flow), so NO stone in costs.
+    minTownhallLevel: 2,
     cost: { wood: 120, gold: 60 },
     upgradeCost: (level) => ({
       wood: 60 * level,
@@ -92,13 +68,55 @@ export const BUILDINGS = {
     }),
   },
 
+  // Unlocks at TH5
+  quarry: {
+    id: "quarry",
+    name: "Quarry",
+    fileBase: "quarry",
+    minTownhallLevel: 5,
+    cost: { wood: 80, gold: 25 },
+    upgradeCost: (level) => ({
+      wood: 30 * level,
+      stone: 20 * level,
+      gold: 10 * level,
+    }),
+  },
+
+  // Unlocks at TH6
+  house: {
+    id: "house",
+    name: "House",
+    fileBase: "house",
+    minTownhallLevel: 1,
+    cost: { wood: 80, gold: 20 },
+    upgradeCost: (level) => ({
+      wood: 50 * level,
+      stone: 20 * level,
+      gold: 20 * level,
+    }),
+  },
+
+  // Unlocks at TH7
+  mine: {
+    id: "mine",
+    name: "Mine",
+    fileBase: "mine",
+    minTownhallLevel: 6,
+    cost: { wood: 120, gold: 40 },
+    upgradeCost: (level) => ({
+      wood: 40 * level,
+      stone: 30 * level,
+      gold: 20 * level,
+    }),
+  },
+
+  // Unlocks at TH8
   academy: {
     id: "academy",
     name: "Academy",
     fileBase: "academy",
     unique: true,
-
-    // Academy is later game — stone is fine here
+    minTownhallLevel: 8,
     cost: { wood: 120, stone: 80, gold: 80 },
     upgradeCost: (level) => ({
       wood: 70 * level,
@@ -107,32 +125,18 @@ export const BUILDINGS = {
     }),
   },
 
+  // Unlocks at TH10
   commandcenter: {
     id: "commandcenter",
     name: "Command Center",
     fileBase: "commandcenter",
     unique: true,
-
-    // Late game — stone is fine
+    minTownhallLevel: 5,
     cost: { wood: 150, stone: 120, gold: 120 },
     upgradeCost: (level) => ({
       wood: 90 * level,
       stone: 80 * level,
       gold: 60 * level,
-    }),
-  },
-
-  house: {
-    id: "house",
-    name: "House",
-    fileBase: "house",
-    cost: { wood: 80, gold: 20 },
-
-    // House unlocks after Quarry in your flow, so stone is fine here
-    upgradeCost: (level) => ({
-      wood: 50 * level,
-      stone: 20 * level,
-      gold: 20 * level,
     }),
   },
 };
