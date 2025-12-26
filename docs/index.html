@@ -16,88 +16,175 @@
       display:block;
     }
 
-    #uiOverlay{
+    /* =============================
+       FIXED HUD + PANELS (viewport)
+    ============================== */
+    #uiFixed{
       position:fixed;
-      left:0; top:0;
-      width:0; height:0;
-      overflow:hidden;
-      pointer-events:none;
+      inset:0;
       z-index:1000;
+      pointer-events:none;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      color:#eaf0ff;
+
+      /* iPhone notch / home bar */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
     }
 
-    #resourceBar{
-      position:absolute;
-      left:0; top:0; right:0;
+    /* ---------- TOP HUD ---------- */
+    .hudTop{
+      position:fixed;
+      left:0; right:0;
+      top:0;
+      padding-top: env(safe-area-inset-top);
+      pointer-events:none;
       display:flex;
-      align-items:center;
       justify-content:space-between;
-      gap:14px;
-
-      padding:12px 14px;
-      background:linear-gradient(180deg, rgba(10,14,30,.92), rgba(0,0,0,.55));
-      color:#eaf0ff;
-      font:14px/1.15 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      gap:10px;
+      padding:10px 10px 8px;
+      background:linear-gradient(180deg, rgba(10,14,30,.92), rgba(0,0,0,.35));
       border-bottom:1px solid rgba(255,255,255,.12);
-
-      pointer-events:auto;
-      user-select:none;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-
-      box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 -1px 0 rgba(255,255,255,.06);
-      touch-action: manipulation;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25), inset 0 -1px 0 rgba(255,255,255,.06);
     }
 
-    #resourceLeft{
+    .pill{
+      pointer-events:auto;
       display:flex;
-      flex-wrap:wrap;
-      gap:12px;
       align-items:center;
-    }
-
-    .resItem{
-      display:flex;
-      gap:8px;
-      align-items:baseline;
-      padding:6px 10px;
-      border-radius:12px;
+      gap:10px;
+      border-radius:14px;
       background:rgba(255,255,255,.06);
-      border:1px solid rgba(255,255,255,.10);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
-      white-space:nowrap;
+      border:1px solid rgba(255,255,255,.12);
+      padding:8px 10px;
+      user-select:none;
+      touch-action:manipulation;
     }
 
-    .resItem b{ font-weight:900; letter-spacing:.2px; }
-    .resItem span{ opacity:.8; font-size:12px; margin-left:2px; }
+    .resourcePill{
+      overflow:auto;
+      white-space:nowrap;
+      max-width: calc(100vw - 160px);
+      scrollbar-width:none;
+    }
+    .resourcePill::-webkit-scrollbar{ display:none; }
 
-    #resourceRight{ display:flex; gap:10px; align-items:center; }
+    .r{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-weight:900;
+      letter-spacing:.2px;
+      font-size:13px;
+      opacity:.95;
+    }
+    .r small{
+      font-weight:700;
+      opacity:.7;
+      margin-left:2px;
+    }
 
-    #resourceRight button{
-      padding:9px 12px;
-      border-radius:12px;
+    .rightPill{ gap:8px; }
+    .iconBtn{
+      pointer-events:auto;
       border:1px solid rgba(255,255,255,.14);
       background:rgba(255,255,255,.08);
       color:#eaf0ff;
-      cursor:pointer;
+      border-radius:12px;
+      padding:9px 10px;
       font:13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      cursor:pointer;
       transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
-      touch-action: manipulation;
+      touch-action:manipulation;
     }
-
-    #resourceRight button:hover{
+    .iconBtn:hover{
       background:rgba(255,255,255,.14);
       border-color:rgba(255,255,255,.22);
       transform: translateY(-1px);
     }
-    #resourceRight button:active{ transform: translateY(0px); }
+    .iconBtn:active{ transform: translateY(0px); }
 
-    #floatingPanels{
-      position:absolute;
+    /* ---------- MID HUD (queue/timers) ---------- */
+    .hudMid{
+      position:fixed;
+      left:0; right:0;
+      top:64px;
+      padding-top: env(safe-area-inset-top);
+      pointer-events:none;
+      display:flex;
+      justify-content:center;
+      padding:8px 10px;
+    }
+    .queuePill{
+      pointer-events:auto;
+      gap:14px;
+      font-weight:900;
+      font-size:13px;
+      opacity:.95;
+    }
+    #queueText, #timerText{ opacity:.95; }
+
+    /* ---------- BOTTOM HUD ---------- */
+    .hudBottom{
+      position:fixed;
+      left:0; right:0;
+      bottom:0;
+      padding-bottom: env(safe-area-inset-bottom);
+      pointer-events:none;
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      padding:10px 10px 12px;
+      background:linear-gradient(0deg, rgba(10,14,30,.92), rgba(0,0,0,.25));
+      border-top:1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 -10px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
+    .bigBtn{
+      pointer-events:auto;
+      min-width:92px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.08);
+      color:#eaf0ff;
+      border-radius:14px;
+      padding:12px 14px;
+      font-weight:900;
+      cursor:pointer;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+      touch-action:manipulation;
+    }
+    .bigBtn:hover{
+      background:rgba(255,255,255,.14);
+      border-color:rgba(255,255,255,.22);
+      transform: translateY(-1px);
+    }
+    .bigBtn:active{ transform: translateY(0px); }
+
+    .bigBtn.primary{
+      background:#22c55e;
+      border-color: rgba(34,197,94,.55);
+      color:#06210f;
+      box-shadow: 0 12px 26px rgba(34,197,94,.18);
+    }
+
+    /* =============================
+       PANELS (Build/Barracks/Settings)
+    ============================== */
+    #panels{
+      position:fixed;
       inset:0;
       pointer-events:none;
+      z-index:1100;
     }
 
     .uiPanel{
+      pointer-events:auto;
       position:absolute;
       min-width:280px;
       max-width:420px;
@@ -106,19 +193,31 @@
       border:1px solid rgba(255,255,255,.18);
       border-radius:16px;
       padding:14px;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      pointer-events:auto;
       box-shadow: 0 14px 40px rgba(0,0,0,.45);
-      touch-action: manipulation;
+      touch-action:manipulation;
     }
     .uiPanel, .uiPanel * { pointer-events:auto; }
-    .uiPanel button, .uiPanel select, .uiPanel input { touch-action: manipulation; }
 
     #buildPopup{ display:none; }
+    #settingsPanel{ display:none; width:380px; }
+    #barracksPanel{ display:none; width:420px; max-height:70vh; overflow:auto; }
+
     #buildTitle{ font-weight:900; margin-bottom:10px; font-size:14px; }
-    #buildGrid{ display:block; }
+    .row{ display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+
+    .closeBtn{
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.10);
+      color:#fff;
+      cursor:pointer;
+      touch-action: manipulation;
+    }
+    .closeBtn:hover{ background:rgba(255,255,255,.16); }
+
     .buildBtn{
       padding:12px;
       border-radius:14px;
@@ -131,23 +230,10 @@
       transition: background 120ms ease, transform 120ms ease;
       width:100%;
       touch-action: manipulation;
+      margin-bottom:10px;
     }
     .buildBtn:hover{ background:rgba(255,255,255,.16); transform: translateY(-1px); }
     .buildBtn:active{ transform: translateY(0px); }
-
-    .row{ display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
-    .closeBtn{
-      padding:9px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.16);
-      background:rgba(255,255,255,.10);
-      color:#fff;
-      cursor:pointer;
-      touch-action: manipulation;
-    }
-    .closeBtn:hover{ background:rgba(255,255,255,.16); }
-
-    #barracksPanel{ display:none; width:420px; max-height:70vh; overflow:auto; }
 
     .upCard{
       background: rgba(0,0,0,.55);
@@ -158,7 +244,6 @@
       backdrop-filter: blur(10px);
       box-shadow: 0 18px 50px rgba(0,0,0,.35);
     }
-
     .upTitle{
       font-size: 18px;
       font-weight: 900;
@@ -166,7 +251,6 @@
       margin-bottom: 8px;
       color:#ffffff;
     }
-
     .upRow{
       display:flex;
       align-items:center;
@@ -185,7 +269,6 @@
       opacity: .78;
       line-height: 1.3;
     }
-
     .upBtn{
       margin-top: 12px;
       width: 100%;
@@ -200,10 +283,6 @@
       box-shadow: 0 12px 26px rgba(34,197,94,.25);
       touch-action: manipulation;
     }
-
-    .upBtn:hover{ filter: brightness(1.05); }
-    .upBtn:active{ transform: translateY(1px); }
-
     .upBtn[disabled]{
       background: rgba(255,255,255,.10);
       color: rgba(255,255,255,.45);
@@ -221,6 +300,35 @@
       background: rgba(0,0,0,.35);
     }
 
+    /* Settings */
+    .setRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      margin-top:10px;
+    }
+    .setRow label{ display:flex; align-items:center; gap:10px; font-weight:900; }
+    .setHint{ margin-top:10px; font-size:12px; opacity:.8; line-height:1.3; }
+    .neutralBtn{
+      margin-top:10px;
+      width:100%;
+      border:1px solid rgba(255,255,255,.16);
+      border-radius:14px;
+      padding:12px 12px;
+      font-weight:900;
+      cursor:pointer;
+      background:rgba(255,255,255,.10);
+      color:#fff;
+      touch-action:manipulation;
+    }
+    .neutralBtn:hover{ background:rgba(255,255,255,.16); }
+
+    /* Barracks UI */
     .bxHeader{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .bxClose{
       padding:9px 12px;
@@ -260,35 +368,6 @@
       color:#eafff2;
     }
     .bxMain{ flex:1; min-width:0; }
-
-    /* Settings Panel */
-    #settingsPanel{ display:none; width:380px; }
-    .setRow{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      padding:10px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.06);
-      margin-top:10px;
-    }
-    .setRow label{ display:flex; align-items:center; gap:10px; font-weight:900; }
-    .setHint{ margin-top:10px; font-size:12px; opacity:.8; line-height:1.3; }
-    .neutralBtn{
-      margin-top:10px;
-      width:100%;
-      border:1px solid rgba(255,255,255,.16);
-      border-radius:14px;
-      padding:12px 12px;
-      font-weight:900;
-      cursor:pointer;
-      background:rgba(255,255,255,.10);
-      color:#fff;
-      touch-action:manipulation;
-    }
-    .neutralBtn:hover{ background:rgba(255,255,255,.16); }
   </style>
 
   <link rel="icon" href="./favicon.ico">
@@ -297,49 +376,72 @@
 <body>
   <canvas id="cityCanvas"></canvas>
 
-  <div id="uiOverlay">
-    <div id="resourceBar">
-      <div id="resourceLeft"></div>
-      <div id="resourceRight">
-        <button id="btnSettings" type="button" data-action="open-settings">Settings</button>
-        <button id="btnSave" type="button">Save</button>
-        <button id="btnLoad" type="button">Load</button>
-        <button id="btnReset" type="button">Reset</button>
+  <!-- FIXED HUD -->
+  <div id="uiFixed">
+    <div class="hudTop">
+      <div class="pill resourcePill" id="resourcePill">
+        <span class="r" id="r_food">🍖 0</span>
+        <span class="r" id="r_wood">🪵 0</span>
+        <span class="r" id="r_stone">🪨 0</span>
+        <span class="r" id="r_ore">⛏️ 0</span>
+        <span class="r" id="r_gold">🪙 0</span>
+        <span class="r" id="r_th">🏛️ TH 0</span>
+      </div>
+
+      <div class="pill rightPill">
+        <button class="iconBtn" id="btnSettings" type="button" title="Settings">⚙️</button>
+        <button class="iconBtn" id="btnSave" type="button" title="Save">💾</button>
+        <button class="iconBtn" id="btnLoad" type="button" title="Load">⬇️</button>
+        <button class="iconBtn" id="btnReset" type="button" title="Reset">↺</button>
       </div>
     </div>
 
-    <div id="floatingPanels">
-      <div id="buildPopup" class="uiPanel">
-        <div id="buildTitle">Build</div>
-        <div id="buildGrid"></div>
-        <div class="row">
-          <button id="buildClose" class="closeBtn" type="button" data-action="build-close">Close</button>
-        </div>
+    <div class="hudMid">
+      <div class="pill queuePill" id="queuePill">
+        <span id="queueText">Queue: 0/2</span>
+        <span id="timerText">Timers: ON</span>
+      </div>
+    </div>
+
+    <div class="hudBottom">
+      <button class="bigBtn" id="btnCity" type="button">City</button>
+      <button class="bigBtn" id="btnWorld" type="button">World</button>
+      <button class="bigBtn primary" id="btnBuild" type="button">Build</button>
+    </div>
+  </div>
+
+  <!-- PANELS -->
+  <div id="panels">
+    <div id="buildPopup" class="uiPanel">
+      <div id="buildTitle">Build</div>
+      <div id="buildGrid"></div>
+      <div class="row">
+        <button id="buildClose" class="closeBtn" type="button" data-action="build-close">Close</button>
+      </div>
+    </div>
+
+    <div id="barracksPanel" class="uiPanel"></div>
+
+    <div id="settingsPanel" class="uiPanel">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="font-weight:900; font-size:14px;">Settings</div>
+        <button class="closeBtn" type="button" data-action="settings-close">Close</button>
       </div>
 
-      <div id="barracksPanel" class="uiPanel"></div>
+      <div class="setRow">
+        <label>
+          <input id="timersToggle" type="checkbox" />
+          Build/Upgrade Timers
+        </label>
+        <span id="timersStateText" style="opacity:.85; font-weight:900;">ON</span>
+      </div>
 
-      <div id="settingsPanel" class="uiPanel">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="font-weight:900; font-size:14px;">Settings</div>
-          <button class="closeBtn" type="button" data-action="settings-close">Close</button>
-        </div>
+      <button class="neutralBtn" type="button" data-action="timers-finish-now">
+        Finish any active timers now
+      </button>
 
-        <div class="setRow">
-          <label>
-            <input id="timersToggle" type="checkbox" />
-            Build/Upgrade Timers
-          </label>
-          <span id="timersStateText" style="opacity:.85; font-weight:900;">ON</span>
-        </div>
-
-        <button class="neutralBtn" type="button" data-action="timers-finish-now">
-          Finish any active timers now
-        </button>
-
-        <div class="setHint">
-          Turn timers <b>OFF</b> to test instantly. If you toggle OFF while anything is in progress, it will auto-finish so you don’t get stuck.
-        </div>
+      <div class="setHint">
+        Turn timers <b>OFF</b> to test instantly. If you toggle OFF while anything is in progress, it will auto-finish so you don’t get stuck.
       </div>
     </div>
   </div>
@@ -347,11 +449,18 @@
   <script type="module">
     import { CITY_PLOTS } from "./js/plots.city.js";
     import { BUILDINGS } from "./js/data/buildingCatalog.js";
-    import { createcitybuildingsSystem } from "./js/systems/cityBuildings.js";
+    import { createCityBuildingsSystem } from "./js/systems/cityBuildings.js";
     import { state } from "./js/state.js";
     import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
-    import { processTrainingQueues } from "./js/systems/trainingsystems.js";
-    import { getTrainingSnapshot, startTrainingInSlot, cancelTraining, syncBarracksSlots } from "./js/systems/trainingsystems.js";
+
+    import {
+      processTrainingQueues,
+      getTrainingSnapshot,
+      startTrainingInSlot,
+      cancelTraining,
+      syncBarracksSlots
+    } from "./js/systems/trainingSystems.js";
+
     import { TROOPS, BARRACKS_TIER_UNLOCK } from "./js/data/troopsCatalog.js";
 
     const BASE_MAP_SRC = "./assets/maps/city/city_tilemap_base.png";
@@ -361,6 +470,17 @@
 
     state.settings ??= {};
     if (typeof state.settings.timersEnabled !== "boolean") state.settings.timersEnabled = true;
+
+    // Ensure resources exist
+    state.resources ??= {};
+    state.resources.food  ??= 0;
+    state.resources.wood  ??= 0;
+    state.resources.stone ??= 0;
+    state.resources.ore   ??= 0;
+    state.resources.gold  ??= 0;
+
+    state.buildings ??= {};
+    state.buildings.levels ??= {};
 
     function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
     function loadImage(src){
@@ -372,7 +492,6 @@
       });
     }
 
-    // ✅ NEW: infer map bounds from plots so cam math (clicking) works immediately
     function inferMapSizeFromPlots(plots, fallbackW = 512, fallbackH = 512){
       if (!Array.isArray(plots) || !plots.length) return { w: fallbackW, h: fallbackH };
       let maxX = 0, maxY = 0;
@@ -382,7 +501,6 @@
         if (x2 > maxX) maxX = x2;
         if (y2 > maxY) maxY = y2;
       }
-      // guard against tiny/zero maps
       return { w: Math.max(fallbackW, Math.ceil(maxX)), h: Math.max(fallbackH, Math.ceil(maxY)) };
     }
 
@@ -394,8 +512,6 @@
       let onPlotClick = null;
 
       let baseImg = null;
-
-      // ✅ initialize to plot-derived size so clicks work instantly
       let baseW = initialMapSize?.w ?? 512;
       let baseH = initialMapSize?.h ?? 512;
 
@@ -475,13 +591,10 @@
         sceneState.selectedPlotId = hit ? hit.id : null;
 
         if (hit && typeof onPlotClick === "function") {
-          const anchorW = { x: hit.x + hit.w/2, y: hit.y + hit.h };
-          const anchorS = worldToScreen(anchorW.x, anchorW.y);
-          onPlotClick(hit, sx, sy, anchorW, anchorS);
+          onPlotClick(hit);
         }
       }
 
-      // Pointer pan/pinch/tap
       const pointers = new Map();
       let isPanning = false;
       let panStart = { x:0, y:0, camX:0, camY:0 };
@@ -565,14 +678,13 @@
         down = null;
       }, { passive:true });
 
-      canvas.addEventListener("pointercancel", (e) => {
-        pointers.delete(e.pointerId);
+      canvas.addEventListener("pointercancel", () => {
+        pointers.clear();
         isPanning = false;
         pinchStart = null;
         down = null;
       }, { passive:true });
 
-      // ✅ run a “quick init” so cam is valid before image finishes loading
       (function quickInit(){
         resizeCanvas();
         cam.x = baseW / 2;
@@ -582,12 +694,10 @@
         clampCameraToMap();
       })();
 
-      // load base map in background and sync to image size when available
       (async function init(){
         try {
           baseImg = await loadImage(baseMapSrc);
           baseW = baseImg.width; baseH = baseImg.height;
-
           cam.x = baseW/2; cam.y = baseH/2;
           cam.minZoom = computeMinZoomToFit();
           cam.zoom = Math.max(cam.zoom, cam.minZoom);
@@ -639,7 +749,6 @@
 
       function drawPlotsOverlay(){
         ctx.setTransform(1,0,0,1,0,0);
-
         for (const p of sceneState.plots) {
           const a = worldToScreen(p.x, p.y);
           const b = worldToScreen(p.x+p.w, p.y+p.h);
@@ -663,203 +772,110 @@
         setPlots(plots){ sceneState.plots = plots; },
         setBuildingsSystem(sys){ buildingsSystem = sys; },
         setOnPlotClick(fn){ onPlotClick = fn; },
-
         update(){ resizeCanvas(); cam.minZoom = computeMinZoomToFit(); clampCameraToMap(); },
-        render(){ drawBase(); drawPlacedBuildings(); drawPlotsOverlay(); },
-
-        worldToScreen,
-        getMapWidth(){ return baseW; },
-        getMapHeight(){ return baseH; },
+        render(){ drawBase(); drawPlacedBuildings(); drawPlotsOverlay(); }
       };
     }
 
+    // ===== DOM refs =====
     const canvas = document.getElementById("cityCanvas");
-
-    // ✅ pass plot-inferred size into the scene
-    const inferred = inferMapSizeFromPlots(CITY_PLOTS, 512, 512);
-    const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC, initialMapSize: inferred });
-    scene.setPlots(CITY_PLOTS);
-
-    const buildings = createcitybuildingsSystem({ basePath: BUILDING_BASE_PATH });
-    scene.setBuildingsSystem(buildings);
-
-    const uiOverlay = document.getElementById("uiOverlay");
-    const resourceBar = document.getElementById("resourceBar");
-    const resourceLeft = document.getElementById("resourceLeft");
 
     const popup = document.getElementById("buildPopup");
     const buildTitle = document.getElementById("buildTitle");
     const buildGrid = document.getElementById("buildGrid");
-   
 
     const barracksPanel = document.getElementById("barracksPanel");
     const settingsPanel = document.getElementById("settingsPanel");
-function isPanelVisible(el){
-  return !!el && getComputedStyle(el).display !== "none";
-}
-
-// Force initial inline state so resize/devtools doesn’t “recenter” hidden panels
-popup.style.display = "none";
-barracksPanel.style.display = "none";
-settingsPanel.style.display = "none";
 
     const timersToggle = document.getElementById("timersToggle");
     const timersStateText = document.getElementById("timersStateText");
 
-    let currentBuildPlot = null;
-    let barracksTab = "train";
+    const r_food  = document.getElementById("r_food");
+    const r_wood  = document.getElementById("r_wood");
+    const r_stone = document.getElementById("r_stone");
+    const r_ore   = document.getElementById("r_ore");
+    const r_gold  = document.getElementById("r_gold");
+    const r_th    = document.getElementById("r_th");
+    const queueText = document.getElementById("queueText");
+    const timerText = document.getElementById("timerText");
 
+    const btnSettings = document.getElementById("btnSettings");
+    const btnSave = document.getElementById("btnSave");
+    const btnLoad = document.getElementById("btnLoad");
+    const btnReset = document.getElementById("btnReset");
+
+    // ===== Scene + Systems =====
+    const inferred = inferMapSizeFromPlots(CITY_PLOTS, 512, 512);
+    const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC, initialMapSize: inferred });
+    scene.setPlots(CITY_PLOTS);
+
+    const buildings = createCityBuildingsSystem({ basePath: BUILDING_BASE_PATH });
+    scene.setBuildingsSystem(buildings);
+
+    // ===== Helpers =====
     function clampNum(v, a, b) {
       v = Number(v);
       if (!Number.isFinite(v)) return a;
       return Math.max(a, Math.min(b, v));
     }
 
+function centerPanelOnScreen(panelEl){
+  const pad = 12;
+
+  const hud = document.getElementById("hudFixed");
+  const topH = hud?.querySelector(".hudTop")?.getBoundingClientRect().height || 0;
+  const midH = hud?.querySelector(".hudMid")?.getBoundingClientRect().height || 0;
+  const botH = hud?.querySelector(".hudBottom")?.getBoundingClientRect().height || 0;
+
+  const safeTop = pad + topH + midH;
+  const safeBot = pad + botH;
+
+  panelEl.style.display = "block";
+  panelEl.style.visibility = "hidden";
+  panelEl.style.left = "0px";
+  panelEl.style.top  = "0px";
+
+  const pw = panelEl.offsetWidth;
+  const ph = panelEl.offsetHeight;
+
+  panelEl.style.visibility = "visible";
+
+  const x = Math.max(pad, Math.min(window.innerWidth  - pw - pad, (window.innerWidth  - pw)/2));
+  const y = Math.max(safeTop, Math.min(window.innerHeight - ph - safeBot, (window.innerHeight - ph)/2));
+
+  panelEl.style.left = `${x}px`;
+  panelEl.style.top  = `${y}px`;
+}
+
+
     function syncSettingsUI(){
       timersToggle.checked = !!state.settings.timersEnabled;
       timersStateText.textContent = state.settings.timersEnabled ? "ON" : "OFF";
-      timersStateText.style.opacity = state.settings.timersEnabled ? "0.9" : "0.8";
-    }
-    syncSettingsUI();
-
-    timersToggle.addEventListener("change", () => {
-      state.settings.timersEnabled = !!timersToggle.checked;
-      syncSettingsUI();
-
-      if (!state.settings.timersEnabled) {
-        buildings.finishAllTimersNow?.();
-        if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
-        if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
-      }
-
-      try { saveGame(); } catch {}
-    });
-
-    function getMapSizeSafe(){
-      const w = (typeof scene.getMapWidth === "function") ? scene.getMapWidth() : 512;
-      const h = (typeof scene.getMapHeight === "function") ? scene.getMapHeight() : 512;
-      return { w, h };
+      timerText.textContent = "Timers: " + (state.settings.timersEnabled ? "ON" : "OFF");
     }
 
-    function worldToScreenSafe(wx, wy){
-      if (typeof scene.worldToScreen === "function") return scene.worldToScreen(wx, wy);
-      return { x: wx, y: wy };
+    function fmt(n){ return Math.floor(n || 0).toLocaleString(); }
+
+    function fmtDuration(ms){
+      const totalSec = Math.max(0, Math.ceil(ms / 1000));
+      const d = Math.floor(totalSec / 86400);
+      const h = Math.floor((totalSec % 86400) / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (d > 0) return `${d}d ${h}h ${m}m`;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
     }
 
-    function canvasPxToCssPage(canvasPxX, canvasPxY){
-      const r = canvas.getBoundingClientRect();
-      return {
-        x: r.left + (canvasPxX / canvas.width) * r.width,
-        y: r.top  + (canvasPxY / canvas.height) * r.height
-      };
-    }
-
-    function updateUiOverlayRect(){
-      const { w: mapW, h: mapH } = getMapSizeSafe();
-      const a = worldToScreenSafe(0, 0);
-      const b = worldToScreenSafe(mapW, mapH);
-      const A = canvasPxToCssPage(a.x, a.y);
-      const B = canvasPxToCssPage(b.x, b.y);
-
-      const left   = Math.min(A.x, B.x);
-      const top    = Math.min(A.y, B.y);
-      const right  = Math.max(A.x, B.x);
-      const bottom = Math.max(A.y, B.y);
-
-      uiOverlay.style.left = `${left}px`;
-      uiOverlay.style.top = `${top}px`;
-      uiOverlay.style.width = `${right - left}px`;
-      uiOverlay.style.height = `${bottom - top}px`;
-    }
-
-    function centerPanelOnScreen(panelEl){
-      const r = canvas.getBoundingClientRect();
-      const overlayRect = uiOverlay.getBoundingClientRect();
-
-      panelEl.style.display = "block";
-      panelEl.style.visibility = "hidden";
-      panelEl.style.left = "0px";
-      panelEl.style.top  = "0px";
-
-      const pw = panelEl.offsetWidth;
-      const ph = panelEl.offsetHeight;
-
-      panelEl.style.visibility = "visible";
-
-      const targetPageX = r.left + r.width / 2;
-      const targetPageY = r.top  + r.height / 2;
-
-      const localX = targetPageX - overlayRect.left - pw / 2;
-      const localY = targetPageY - overlayRect.top  - ph / 2;
-
-      const pad = 12;
-      const barH = resourceBar.offsetHeight || 64;
-
-      const x = clampNum(localX, pad, Math.max(pad, overlayRect.width - pw - pad));
-      const y = clampNum(localY, pad + barH, Math.max(pad + barH, overlayRect.height - ph - pad));
-
-      panelEl.style.left = `${x}px`;
-      panelEl.style.top  = `${y}px`;
-    }
-
-    // iOS ghost-tap guard: prevent plot taps right after UI taps
-    let lastUiActionAt = 0;
-    function markUiAction(){ lastUiActionAt = performance.now(); }
-    function uiJustHappened(ms = 450){ return (performance.now() - lastUiActionAt) < ms; }
-    let lastDelegatedFire = 0;
-
-    function isUiTargetEvent(e){
-      return !!e.target?.closest?.("#resourceBar, .uiPanel");
-    }
-
-    uiOverlay.addEventListener("pointerdown", (e) => {
-      if (!isUiTargetEvent(e)) return;
-      markUiAction();
-      e.stopPropagation();
-    }, { capture:true, passive:true });
-
-    uiOverlay.addEventListener("pointerup", async (e) => {
-      if (!isUiTargetEvent(e)) return;
-
-      const now = performance.now();
-      if (now - lastDelegatedFire < 250) return;
-      lastDelegatedFire = now;
-
-      markUiAction();
-      e.preventDefault();
-      e.stopPropagation();
-
-      const btn = e.target?.closest?.("[data-action]");
-      if (!btn) return;
-
-      const action = btn.getAttribute("data-action");
-      await handleUiAction(action, btn);
-    }, { capture:true, passive:false });
-
-    function fmtCost(cost) {
-      if (!cost) return "";
-      const parts = [];
-      if (cost.food)  parts.push(`F:${cost.food}`);
-      if (cost.wood)  parts.push(`W:${cost.wood}`);
-      if (cost.stone) parts.push(`S:${cost.stone}`);
-      if (cost.ore)   parts.push(`O:${cost.ore}`);
-      if (cost.gold)  parts.push(`G:${cost.gold}`);
-      return parts.length ? parts.join(" ") : "";
-    }
-    function fmtCostPretty(cost){
-      if (!cost) return "?";
-      const parts = [];
-      if (cost.food)  parts.push(`F:${cost.food}`);
-      if (cost.wood)  parts.push(`W:${cost.wood}`);
-      if (cost.stone) parts.push(`S:${cost.stone}`);
-      if (cost.ore)   parts.push(`O:${cost.ore}`);
-      if (cost.gold)  parts.push(`G:${cost.gold}`);
-      return parts.length ? parts.join("  ") : "?";
+    function hasBuilding(buildingId){
+      const all = buildings.getAllPlaced?.() || [];
+      return all.some(b => b.buildingId === buildingId);
     }
 
     function isResourceUnlocked(res) {
-      if (res === "stone") return !!buildings.getByBuildingId?.("quarry");
-      if (res === "ore")   return !!buildings.getByBuildingId?.("mine");
+      if (res === "stone") return hasBuilding("quarry");
+      if (res === "ore")   return hasBuilding("mine");
       return true;
     }
 
@@ -874,20 +890,20 @@ settingsPanel.style.display = "none";
       return true;
     }
 
-    function fmtDuration(ms){
-      const totalSec = Math.max(0, Math.ceil(ms / 1000));
-      const d = Math.floor(totalSec / 86400);
-      const h = Math.floor((totalSec % 86400) / 3600);
-      const m = Math.floor((totalSec % 3600) / 60);
-      const s = totalSec % 60;
-      if (d > 0) return `${d}d ${h}h ${m}m`;
-      if (h > 0) return `${h}h ${m}m`;
-      if (m > 0) return `${m}m ${s}s`;
-      return `${s}s`;
+    function fmtCostPretty(cost){
+      if (!cost) return "?";
+      const parts = [];
+      if (cost.food)  parts.push(`F:${cost.food}`);
+      if (cost.wood)  parts.push(`W:${cost.wood}`);
+      if (cost.stone) parts.push(`S:${cost.stone}`);
+      if (cost.ore)   parts.push(`O:${cost.ore}`);
+      if (cost.gold)  parts.push(`G:${cost.gold}`);
+      return parts.length ? parts.join("  ") : "?";
     }
 
     function syncLevelsFromPlaced() {
       const lv = (state.buildings.levels ||= {});
+      // baseline keys
       lv.townhall = 0;
       lv.house = 0;
       lv.farm = 0;
@@ -907,35 +923,35 @@ settingsPanel.style.display = "none";
       state.buildings.townhallLevel = lv.townhall || 0;
     }
 
+    function getQueueInfoSafe() {
+      return buildings.getBuildQueueInfo?.() || { active: 0, max: 2, full: false };
+    }
+
+    // ===== UI State =====
+    let currentBuildPlot = null;
+    let barracksTab = "train";
+
     function getStatusCompat(plotId){
       return buildings.getStatus?.(plotId) || null;
     }
-
     function canBuildBuildingCompat(buildingId){
       return buildings.canBuildBuilding?.(buildingId) ?? { ok:true };
     }
-
     function canUpgradePlotCompat(plotId){
       return buildings.canUpgradePlot?.(plotId) ?? { ok:true };
     }
-
     async function placeBuildingCompat(plotId, buildingId){
       return await buildings.placeBuildingOnPlot(plotId, buildingId, 1);
     }
-
     async function upgradePlotCompat(plotId){
       return await buildings.upgradePlot(plotId);
     }
 
-function getQueueInfoSafe() {
-  return buildings.getBuildQueueInfo?.() || { active: 0, max: 2, full: false };
-}
-
     function renderBuildPopupForPlot(plot, { recenter=true } = {}){
       currentBuildPlot = plot;
-      const existing = buildings.getPlacedOnPlot?.(plot.id);
       buildGrid.innerHTML = "";
 
+      const existing = buildings.getPlacedOnPlot?.(plot.id);
       const st = getStatusCompat(plot.id);
 
       if (existing) {
@@ -952,8 +968,11 @@ function getQueueInfoSafe() {
 
         const q = getQueueInfoSafe();
         const queueBlocked = state.settings.timersEnabled && q.full;
-        const disabled = constructing || upgrading || queueBlocked || (!chk.ok || !affordable || !upgradeCost);
 
+        const disabled =
+          constructing || upgrading ||
+          queueBlocked ||
+          (!chk.ok || !affordable || !upgradeCost);
 
         const stateTag = constructing ? "Constructing" : upgrading ? "Upgrading" : "Occupied";
         buildTitle.textContent = `Plot: ${plot.id} (${stateTag})`;
@@ -976,13 +995,15 @@ function getQueueInfoSafe() {
             </button>
 
             ${timerLine}
+            ${(!constructing && !upgrading && queueBlocked) ? `<div class="upReason">All ${q.max} builder queues are busy.</div>` : ""}
             ${(!constructing && !upgrading && !chk.ok) ? `<div class="upReason">${chk.reason}</div>` : ""}
             ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable) ? `<div class="upReason">Not enough resources</div>` : ""}
           </div>
         `;
       } else {
         buildTitle.textContent = `Plot: ${plot.id} (Build)`;
-        const q = buildings.getQueueInfoSafe?.() || { full:false, max:2 };
+
+        const q = getQueueInfoSafe();
         const queueBlocked = state.settings.timersEnabled && q.full;
 
         const frag = document.createDocumentFragment();
@@ -996,7 +1017,9 @@ function getQueueInfoSafe() {
           btn.className = "buildBtn";
           btn.setAttribute("data-action", "build-place");
           btn.setAttribute("data-building-id", bKey);
-          btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCost(cost)}` : ""}`;
+
+          const line2 = cost ? fmtCostPretty(cost) : "";
+          btn.textContent = (def?.name || bKey) + (line2 ? ("\n" + line2) : "");
 
           const gate = canBuildBuildingCompat(bKey);
           if (!gate.ok) {
@@ -1008,11 +1031,12 @@ function getQueueInfoSafe() {
             btn.style.opacity = "0.35";
             btn.title = "Not enough resources";
           }
+
           if (queueBlocked) {
             btn.disabled = true;
             btn.style.opacity = "0.35";
             btn.title = `All ${q.max} builder queues are busy.`;
-}
+          }
 
           frag.appendChild(btn);
         }
@@ -1021,10 +1045,9 @@ function getQueueInfoSafe() {
       }
 
       popup.style.display = "block";
-      if (recenter) centerPanelOnScreen(popup);
+      if (recenter) centerPanel(popup);
     }
 
-    // Barracks panel (unchanged below)
     function fmtMMSS(ms) {
       const total = Math.max(0, Math.ceil(ms / 1000));
       const m = Math.floor(total / 60);
@@ -1152,7 +1175,10 @@ function getQueueInfoSafe() {
         const upgrading = !!st?.upgrading;
         const constructing = !!st?.constructing;
 
-        const disabled = constructing || upgrading || (!chk.ok || (upgradeCost && !affordable) || !upgradeCost);
+        const q = getQueueInfoSafe();
+        const queueBlocked = state.settings.timersEnabled && q.full;
+
+        const disabled = constructing || upgrading || queueBlocked || (!chk.ok || (upgradeCost && !affordable) || !upgradeCost);
 
         let timerLine = "";
         if (constructing) timerLine = `<div class="upReason">Under construction… <b>${fmtDuration(st.buildRemainingMs)}</b> left</div>`;
@@ -1170,7 +1196,6 @@ function getQueueInfoSafe() {
 
             ${timerLine}
             ${(!constructing && !upgrading && queueBlocked) ? `<div class="upReason">All ${q.max} builder queues are busy.</div>` : ""}
-
             ${(!constructing && !upgrading && !chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
             ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable ? `<div class="upReason">Not enough resources</div>` : "")}
 
@@ -1207,16 +1232,16 @@ function getQueueInfoSafe() {
         </div>
       `;
 
-      if (recenter) centerPanelOnScreen(barracksPanel);
+      if (recenter) centerPanel(barracksPanel);
     }
 
-    async function handleUiAction(action, el){
+    async function handleAction(action, el){
       if (action === "open-settings") {
         popup.style.display = "none";
         barracksPanel.style.display = "none";
         settingsPanel.style.display = "block";
         syncSettingsUI();
-        centerPanelOnScreen(settingsPanel);
+        centerPanel(settingsPanel);
         return;
       }
       if (action === "settings-close") { settingsPanel.style.display = "none"; return; }
@@ -1232,6 +1257,7 @@ function getQueueInfoSafe() {
       if (action === "build-upgrade") {
         const plot = currentBuildPlot;
         if (!plot) return;
+
         const st = getStatusCompat(plot.id);
         if (st?.constructing || st?.upgrading) return;
 
@@ -1247,6 +1273,7 @@ function getQueueInfoSafe() {
       if (action === "build-place") {
         const plot = currentBuildPlot;
         if (!plot) return;
+
         const bKey = el.getAttribute("data-building-id");
         if (!bKey) return;
 
@@ -1306,9 +1333,39 @@ function getQueueInfoSafe() {
       }
     }
 
+    // Delegated clicks for panel buttons
+    document.getElementById("panels").addEventListener("pointerup", async (e) => {
+      const btn = e.target?.closest?.("[data-action]");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const action = btn.getAttribute("data-action");
+      await handleAction(action, btn);
+    }, { passive:false });
+
+    // Settings toggle
+    syncSettingsUI();
+    timersToggle.addEventListener("change", () => {
+      state.settings.timersEnabled = !!timersToggle.checked;
+      syncSettingsUI();
+
+      if (!state.settings.timersEnabled) {
+        buildings.finishAllTimersNow?.();
+        if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
+        if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
+      }
+      try { saveGame(); } catch {}
+    });
+
+    // Top HUD buttons
+    btnSettings.addEventListener("pointerup", () => handleAction("open-settings"));
+    btnSave.addEventListener("pointerup", () => saveGame());
+    btnLoad.addEventListener("pointerup", () => loadGame());
+    btnReset.addEventListener("pointerup", () => resetSave());
+
+    // Plot click
     scene.setOnPlotClick((plot) => {
       if (!plot) return;
-      if (uiJustHappened()) return;
       if (settingsPanel.style.display !== "none") return;
 
       const existing = buildings.getPlacedOnPlot?.(plot.id);
@@ -1328,32 +1385,7 @@ function getQueueInfoSafe() {
       renderBuildPopupForPlot(plot, { recenter:true });
     });
 
-    const fmt = (n) => Math.floor(n || 0).toLocaleString();
-    const fmtRate = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString();
-
-    function renderResourceBar(){
-      const p = getProductionPerSecond();
-      resourceLeft.innerHTML = `
-        <div class="resItem"><b>Food</b> ${fmt(state.resources.food)} <span>(+${fmtRate(p.food)}/s)</span></div>
-        <div class="resItem"><b>Wood</b> ${fmt(state.resources.wood)} <span>(+${fmtRate(p.wood)}/s)</span></div>
-        <div class="resItem"><b>Stone</b> ${fmt(state.resources.stone)} <span>(+${fmtRate(p.stone)}/s)</span></div>
-        <div class="resItem"><b>Ore</b> ${fmt(state.resources.ore)} <span>(+${fmtRate(p.ore)}/s)</span></div>
-        <div class="resItem"><b>Gold</b> ${fmt(state.resources.gold)} <span>(+${fmtRate(p.gold)}/s)</span></div>
-        <div class="resItem" style="opacity:.9"><b>TH</b> ${state.buildings?.levels?.townhall || 0}</div>
-        <div class="resItem" style="opacity:.85"><b>Timers</b> ${state.settings.timersEnabled ? "ON" : "OFF"}</div>
-      `;
-    }
-
-    let econLast = 0;
-    function economyFrame(t){
-      const dt = econLast ? (t - econLast) / 1000 : 0;
-      econLast = t;
-      updateEconomy(dt);
-      renderResourceBar();
-      requestAnimationFrame(economyFrame);
-    }
-    requestAnimationFrame(economyFrame);
-
+    // ===== Save / Load =====
     function buildSavePayload() {
       syncLevelsFromPlaced();
       const placed = [];
@@ -1385,15 +1417,7 @@ function getQueueInfoSafe() {
 
     function saveGame() {
       const payload = buildSavePayload();
-      const json = JSON.stringify(payload);
-      localStorage.setItem(SAVE_KEY, json);
-
-      const btn = document.getElementById("btnSave");
-      if (btn) {
-        const prev = btn.textContent;
-        btn.textContent = "Saved ✓";
-        setTimeout(() => (btn.textContent = prev), 900);
-      }
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
     }
 
     function loadGame() {
@@ -1457,56 +1481,68 @@ function getQueueInfoSafe() {
       }
     })();
 
-    document.getElementById("btnSave").onclick = saveGame;
-    document.getElementById("btnLoad").onclick = loadGame;
-    document.getElementById("btnReset").onclick = resetSave;
+    // Autosave
     setInterval(() => { try { saveGame(); } catch {} }, 10000);
 
-    setInterval(() => {
-      if (barracksPanel.style.display === "none") return;
-      const snap = getTrainingSnapshot?.("barracks") ?? {};
-      const slots = normalizeSlots(snap);
-      if (!slots.some(s => s.status === "training")) return;
-      requestAnimationFrame(() => renderBarracksPanel({ recenter:false }));
-    }, 250);
+    // ===== Fixed HUD refresh =====
+    function refreshHud(){
+      const p = getProductionPerSecond();
+      // show totals; if you want rates later we can add a long-press tooltip or a details panel
+      r_food.textContent  = `🍖 ${fmt(state.resources.food)}`;
+      r_wood.textContent  = `🪵 ${fmt(state.resources.wood)}`;
+      r_stone.textContent = `🪨 ${fmt(state.resources.stone)}`;
+      r_ore.textContent   = `⛏️ ${fmt(state.resources.ore)}`;
+      r_gold.textContent  = `🪙 ${fmt(state.resources.gold)}`;
+      r_th.textContent    = `🏛️ TH ${state.buildings?.levels?.townhall || 0}`;
 
-    let lastTimersTick = 0;
-    function timersFrame(){
-      const now = performance.now();
-      if (now - lastTimersTick < 250) return;
-      lastTimersTick = now;
+      const q = getQueueInfoSafe();
+      queueText.textContent = `Queue: ${q.active || 0}/${q.max || 2}`;
+      timerText.textContent = "Timers: " + (state.settings.timersEnabled ? "ON" : "OFF");
 
-      const changed = buildings.tick?.() || false;
-
-      if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
-      if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
-
-      if (changed) {
-        syncLevelsFromPlaced();
-        try { saveGame(); } catch {}
-      }
+      // optional: could show rates somewhere later (p.food etc)
+      void p;
     }
 
-  window.addEventListener("resize", () => {
-  updateUiOverlayRect();
-  if (isPanelVisible(popup)) centerPanelOnScreen(popup);
-  if (isPanelVisible(barracksPanel)) centerPanelOnScreen(barracksPanel);
-  if (isPanelVisible(settingsPanel)) centerPanelOnScreen(settingsPanel);
-});
+    // ===== Main loop =====
+    let lastT = 0;
+    function frame(t){
+      const dt = lastT ? (t - lastT) / 1000 : 0;
+      lastT = t;
 
-
-
-    function frame(){
       scene.update();
       scene.render();
 
-      processTrainingQueues();
-      updateUiOverlayRect();
-      timersFrame();
+      // economy tick
+      updateEconomy(dt);
 
+      // training tick
+      try { processTrainingQueues?.(); } catch {}
+
+      // build/upgrade timers tick
+      try {
+        const changed = buildings.tick?.() || false;
+        if (changed) {
+          syncLevelsFromPlaced();
+          try { saveGame(); } catch {}
+        }
+      } catch {}
+
+      // update open panels (timer countdowns)
+      if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
+      if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
+
+      refreshHud();
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
+
+    // keep centered panels centered on resize
+    window.addEventListener("resize", () => {
+      if (popup.style.display !== "none") centerPanel(popup);
+      if (barracksPanel.style.display !== "none") centerPanel(barracksPanel);
+      if (settingsPanel.style.display !== "none") centerPanel(settingsPanel);
+    });
   </script>
 </body>
 </html>
+  

@@ -61,15 +61,7 @@ html, body{
    UI Overlay (CLIPPED to the visible map rect)
    JS sets left/top/width/height each frame based on camera.
 ========================================================= */
-#uiOverlay{
-  position: fixed;
-  z-index: 60;
 
-  overflow: hidden;      /* hard clip: UI can’t escape map rect */
-  pointer-events: none;  /* default pass-through */
-
-  border-radius: var(--panel-radius); /* optional, looks nice */
-}
 
 /* top resource bar (inside overlay) */
 /* top resource bar (inside overlay) */
@@ -347,4 +339,22 @@ html, body{
 .uiPanel,
 .uiPanel * {
   pointer-events: auto;
+}
+#uiFixed{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:1000;
+}
+
+/* panels float above canvas but stay inside screen */
+.uiPanel{
+  position:fixed;
+  pointer-events:auto;
+
+  width:min(420px, calc(100vw - 24px));
+  max-height:calc(100vh - 170px); /* top+bottom HUD space */
+  overflow:auto;
+
+  border-radius:16px;
 }
