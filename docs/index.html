@@ -7,217 +7,221 @@
   <title>Empire</title>
 
   <style>
-    html, body { height:100%; margin:0; background:#0f1220; overflow:hidden; }
-    canvas{
-      position:fixed; inset:0; width:100%; height:100%;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      touch-action:none;
-      display:block;
+    :root{
+      --bg:#0f1220;
+      --text:#e5e7eb;
+
+      --panel-bg: rgba(0,0,0,.78);
+      --panel-border: rgba(255,255,255,.16);
+      --panel-radius: 16px;
+
+      --hud-bg: rgba(10,14,30,.70);
+      --hud-border: rgba(255,255,255,.14);
+      --hud-pill: rgba(255,255,255,.08);
+      --hud-pill-border: rgba(255,255,255,.12);
+
+      --pad: 12px;
+      --font: 12px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial;
     }
 
-    /* =============================
-       FIXED HUD + PANELS (viewport)
-    ============================== */
-    #uiFixed{
+    html, body{
+      height:100%;
+      margin:0;
+      background:var(--bg);
+      overflow:hidden;
+      color:var(--text);
+      -webkit-text-size-adjust:100%;
+      width:100%;
+      overflow-x:hidden;
+    }
+
+    /* Canvas */
+    #cityCanvas{
       position:fixed;
       inset:0;
-      z-index:1000;
-      pointer-events:none;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      color:#eaf0ff;
+      width:100%;
+      height:100%;
+      display:block;
 
-      /* iPhone notch / home bar */
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+
+      touch-action:none;
+      user-select:none;
     }
 
-    /* ---------- TOP HUD ---------- */
-    .hudTop{
+    /* =========================
+       HUD FIXED (the only HUD)
+       ========================= */
+
+    /* wrapper NEVER blocks map */
+    #hudFixed{
       position:fixed;
-      left:0; right:0;
-      top:0;
-      padding-top: env(safe-area-inset-top);
+      inset:0;
       pointer-events:none;
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      padding:10px 10px 8px;
-      background:linear-gradient(180deg, rgba(10,14,30,.92), rgba(0,0,0,.35));
-      border-bottom:1px solid rgba(255,255,255,.12);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      box-shadow: 0 10px 30px rgba(0,0,0,.25), inset 0 -1px 0 rgba(255,255,255,.06);
+      z-index:2000;
+    }
+
+    /* bars do not catch clicks either */
+    #hudFixed .hudTop,
+    #hudFixed .hudMid,
+    #hudFixed .hudBottom{
+      position:fixed;
+      left: var(--pad);
+      right: var(--pad);
+      pointer-events:none;
+      z-index:2001;
+    }
+
+    #hudFixed .hudTop{ top: calc(var(--pad) + env(safe-area-inset-top)); }
+    #hudFixed .hudMid{ top: calc(var(--pad) + env(safe-area-inset-top) + 56px); }
+    #hudFixed .hudBottom{ bottom: calc(var(--pad) + env(safe-area-inset-bottom)); }
+
+    /* Only interactive elements are clickable */
+    #hudFixed button,
+    #hudFixed .pill,
+    #hudFixed .iconBtn,
+    #hudFixed .bigBtn{
+      pointer-events:auto;
+      touch-action: manipulation;
     }
 
     .pill{
-      pointer-events:auto;
       display:flex;
       align-items:center;
       gap:10px;
+      padding:10px 12px;
       border-radius:14px;
-      background:rgba(255,255,255,.06);
-      border:1px solid rgba(255,255,255,.12);
-      padding:8px 10px;
-      user-select:none;
-      touch-action:manipulation;
+      background: var(--hud-bg);
+      border:1px solid var(--hud-border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
     }
 
     .resourcePill{
-      overflow:auto;
-      white-space:nowrap;
-      max-width: calc(100vw - 160px);
-      scrollbar-width:none;
+      flex-wrap:wrap;
+      justify-content:flex-start;
+      background: linear-gradient(180deg, rgba(10,14,30,.88), rgba(0,0,0,.45));
     }
-    .resourcePill::-webkit-scrollbar{ display:none; }
 
-    .r{
+    .resourcePill .r{
+      display:inline-flex;
+      align-items:baseline;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:12px;
+      background: var(--hud-pill);
+      border:1px solid var(--hud-pill-border);
+      font: 13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      white-space:nowrap;
+    }
+
+    .rightPill{
+      justify-content:flex-end;
+      gap:8px;
+      background: rgba(0,0,0,.40);
+    }
+
+    .hudTop{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .iconBtn{
+      width:42px;
+      height:42px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.08);
+      color:#eaf0ff;
+      cursor:pointer;
+      font: 16px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
       display:inline-flex;
       align-items:center;
-      gap:6px;
-      font-weight:900;
-      letter-spacing:.2px;
-      font-size:13px;
-      opacity:.95;
+      justify-content:center;
+      transition: transform 120ms ease, background 120ms ease;
     }
-    .r small{
-      font-weight:700;
-      opacity:.7;
-      margin-left:2px;
-    }
-
-    .rightPill{ gap:8px; }
-    .iconBtn{
-      pointer-events:auto;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.08);
-      color:#eaf0ff;
-      border-radius:12px;
-      padding:9px 10px;
-      font:13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      cursor:pointer;
-      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
-      touch-action:manipulation;
-    }
-    .iconBtn:hover{
-      background:rgba(255,255,255,.14);
-      border-color:rgba(255,255,255,.22);
-      transform: translateY(-1px);
-    }
+    .iconBtn:hover{ background: rgba(255,255,255,.14); transform: translateY(-1px); }
     .iconBtn:active{ transform: translateY(0px); }
 
-    /* ---------- MID HUD (queue/timers) ---------- */
     .hudMid{
-      position:fixed;
-      left:0; right:0;
-      top:64px;
-      padding-top: env(safe-area-inset-top);
-      pointer-events:none;
       display:flex;
       justify-content:center;
-      padding:8px 10px;
     }
-    .queuePill{
-      pointer-events:auto;
-      gap:14px;
-      font-weight:900;
-      font-size:13px;
-      opacity:.95;
-    }
-    #queueText, #timerText{ opacity:.95; }
 
-    /* ---------- BOTTOM HUD ---------- */
+    .queuePill{
+      justify-content:center;
+      gap:14px;
+      padding:8px 12px;
+      font: 12px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      opacity:.92;
+    }
+
     .hudBottom{
-      position:fixed;
-      left:0; right:0;
-      bottom:0;
-      padding-bottom: env(safe-area-inset-bottom);
-      pointer-events:none;
       display:flex;
       justify-content:center;
       gap:10px;
-      padding:10px 10px 12px;
-      background:linear-gradient(0deg, rgba(10,14,30,.92), rgba(0,0,0,.25));
-      border-top:1px solid rgba(255,255,255,.12);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      box-shadow: 0 -10px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.06);
     }
 
     .bigBtn{
-      pointer-events:auto;
-      min-width:92px;
+      min-width:120px;
+      padding:14px 16px;
+      border-radius:16px;
       border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.08);
+      background: rgba(255,255,255,.08);
       color:#eaf0ff;
-      border-radius:14px;
-      padding:12px 14px;
+      font: 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
       font-weight:900;
       cursor:pointer;
-      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
-      touch-action:manipulation;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+      transition: transform 120ms ease, background 120ms ease;
     }
-    .bigBtn:hover{
-      background:rgba(255,255,255,.14);
-      border-color:rgba(255,255,255,.22);
-      transform: translateY(-1px);
-    }
+    .bigBtn:hover{ background: rgba(255,255,255,.14); transform: translateY(-1px); }
     .bigBtn:active{ transform: translateY(0px); }
 
-    .bigBtn.primary{
-      background:#22c55e;
-      border-color: rgba(34,197,94,.55);
-      color:#06210f;
-      box-shadow: 0 12px 26px rgba(34,197,94,.18);
-    }
-
-    /* =============================
-       PANELS (Build/Barracks/Settings)
-    ============================== */
-    #panels{
+    /* =========================
+       UI PANELS (fixed screen)
+       ========================= */
+    #uiFixed{
       position:fixed;
       inset:0;
       pointer-events:none;
-      z-index:1100;
+      z-index:3000;
     }
 
     .uiPanel{
+      position:fixed;
       pointer-events:auto;
-      position:absolute;
-      min-width:280px;
-      max-width:420px;
-      background:rgba(0,0,0,.78);
-      color:#fff;
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:16px;
-      padding:14px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--panel-radius);
+      color: var(--text);
+      font: var(--font);
+      padding: 14px;
+      box-sizing:border-box;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      box-shadow: 0 14px 40px rgba(0,0,0,.45);
-      touch-action:manipulation;
+      box-shadow: 0 18px 50px rgba(0,0,0,.55);
+
+      width: min(420px, calc(100vw - 24px));
+      max-height: calc(100vh - 190px); /* top+mid+bottom safe */
+      overflow: auto;
+      display:none;
     }
-    .uiPanel, .uiPanel * { pointer-events:auto; }
 
-    #buildPopup{ display:none; }
-    #settingsPanel{ display:none; width:380px; }
-    #barracksPanel{ display:none; width:420px; max-height:70vh; overflow:auto; }
-
-    #buildTitle{ font-weight:900; margin-bottom:10px; font-size:14px; }
-    .row{ display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
-
-    .closeBtn{
-      padding:9px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.16);
-      background:rgba(255,255,255,.10);
-      color:#fff;
-      cursor:pointer;
+    .uiPanel button, .uiPanel select, .uiPanel input{
       touch-action: manipulation;
+      pointer-events:auto;
     }
-    .closeBtn:hover{ background:rgba(255,255,255,.16); }
 
+    /* Build popup internal */
+    #buildTitle{ font-weight:900; font-size:14px; margin-bottom:10px; }
+    #buildGrid{ display:block; }
     .buildBtn{
       padding:12px;
       border-radius:14px;
@@ -227,80 +231,23 @@
       cursor:pointer;
       text-align:left;
       white-space:pre-line;
-      transition: background 120ms ease, transform 120ms ease;
       width:100%;
-      touch-action: manipulation;
-      margin-bottom:10px;
+      margin:6px 0;
     }
-    .buildBtn:hover{ background:rgba(255,255,255,.16); transform: translateY(-1px); }
-    .buildBtn:active{ transform: translateY(0px); }
+    .buildBtn:hover{ background:rgba(255,255,255,.16); }
+    .row{ display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+    .closeBtn{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.10);
+      color:#fff;
+      cursor:pointer;
+    }
+    .closeBtn:hover{ background:rgba(255,255,255,.16); }
 
-    .upCard{
-      background: rgba(0,0,0,.55);
-      border: 1px solid rgba(255,255,255,.14);
-      border-radius: 16px;
-      padding: 14px;
-      color: #e5e7eb;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 18px 50px rgba(0,0,0,.35);
-    }
-    .upTitle{
-      font-size: 18px;
-      font-weight: 900;
-      letter-spacing: .2px;
-      margin-bottom: 8px;
-      color:#ffffff;
-    }
-    .upRow{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      font-size: 14px;
-      margin: 6px 0;
-      opacity: .95;
-    }
-    .upRow b{ font-weight: 900; }
-    .upCost{ font-weight: 900; letter-spacing: .3px; }
-
-    .upHint{
-      margin-top: 10px;
-      font-size: 12px;
-      opacity: .78;
-      line-height: 1.3;
-    }
-    .upBtn{
-      margin-top: 12px;
-      width: 100%;
-      border: 0;
-      border-radius: 14px;
-      padding: 14px 14px;
-      font-weight: 900;
-      font-size: 16px;
-      cursor: pointer;
-      background: #22c55e;
-      color: #06210f;
-      box-shadow: 0 12px 26px rgba(34,197,94,.25);
-      touch-action: manipulation;
-    }
-    .upBtn[disabled]{
-      background: rgba(255,255,255,.10);
-      color: rgba(255,255,255,.45);
-      box-shadow: none;
-      cursor: not-allowed;
-    }
-
-    .upReason{
-      margin-top: 10px;
-      font-size: 12px;
-      opacity: .85;
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.35);
-    }
-
-    /* Settings */
+    /* Settings panel */
+    #settingsPanel{ width:min(380px, calc(100vw - 24px)); }
     .setRow{
       display:flex;
       align-items:center;
@@ -324,50 +271,59 @@
       cursor:pointer;
       background:rgba(255,255,255,.10);
       color:#fff;
-      touch-action:manipulation;
     }
     .neutralBtn:hover{ background:rgba(255,255,255,.16); }
 
-    /* Barracks UI */
-    .bxHeader{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-    .bxClose{
-      padding:9px 12px;
+    /* Barracks panel can be larger */
+    #barracksPanel{
+      width:min(520px, calc(100vw - 24px));
+      max-height:calc(100vh - 190px);
+      overflow:auto;
+    }
+
+    .upCard{
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px;
+      padding: 14px;
+      color: #e5e7eb;
+      box-shadow: 0 18px 50px rgba(0,0,0,.35);
+    }
+    .upTitle{ font-size:18px; font-weight:900; margin-bottom:8px; color:#fff; }
+    .upRow{ display:flex; justify-content:space-between; gap:10px; font-size:14px; margin:6px 0; opacity:.95; }
+    .upRow b{ font-weight:900; }
+    .upCost{ font-weight:900; letter-spacing:.3px; }
+    .upHint{ margin-top:10px; font-size:12px; opacity:.78; line-height:1.3; }
+
+    .upBtn{
+      margin-top: 12px;
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 14px;
+      font-weight: 900;
+      font-size: 16px;
+      cursor: pointer;
+      background: #22c55e;
+      color: #06210f;
+      box-shadow: 0 12px 26px rgba(34,197,94,.25);
+    }
+    .upBtn[disabled]{
+      background: rgba(255,255,255,.10);
+      color: rgba(255,255,255,.45);
+      box-shadow:none;
+      cursor:not-allowed;
+    }
+
+    .upReason{
+      margin-top:10px;
+      font-size:12px;
+      opacity:.85;
+      padding:10px;
       border-radius:12px;
-      border:1px solid rgba(255,255,255,.16);
-      background:rgba(255,255,255,.10);
-      color:#fff;
-      cursor:pointer;
-      touch-action: manipulation;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.35);
     }
-    .bxClose:hover{ background:rgba(255,255,255,.16); }
-    .bxWrap{ display:flex; gap:12px; }
-    .bxTabs{
-      width:120px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      padding-right:10px;
-      border-right:1px solid rgba(255,255,255,.10);
-    }
-    .bxTab{
-      width:100%;
-      text-align:left;
-      padding:10px 10px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.06);
-      color:#e5e7eb;
-      cursor:pointer;
-      font-weight:900;
-      touch-action: manipulation;
-    }
-    .bxTab:hover{ background:rgba(255,255,255,.10); }
-    .bxTab.active{
-      background:rgba(34,197,94,.18);
-      border-color:rgba(34,197,94,.35);
-      color:#eafff2;
-    }
-    .bxMain{ flex:1; min-width:0; }
   </style>
 
   <link rel="icon" href="./favicon.ico">
@@ -376,28 +332,26 @@
 <body>
   <canvas id="cityCanvas"></canvas>
 
-  <!-- FIXED HUD -->
-  <div id="uiFixed">
+  <!-- HUD FIXED (only HUD) -->
+  <div id="hudFixed">
     <div class="hudTop">
-      <div class="pill resourcePill" id="resourcePill">
+      <div class="pill resourcePill">
         <span class="r" id="r_food">🍖 0</span>
         <span class="r" id="r_wood">🪵 0</span>
         <span class="r" id="r_stone">🪨 0</span>
         <span class="r" id="r_ore">⛏️ 0</span>
         <span class="r" id="r_gold">🪙 0</span>
-        <span class="r" id="r_th">🏛️ TH 0</span>
       </div>
 
       <div class="pill rightPill">
-        <button class="iconBtn" id="btnSettings" type="button" title="Settings">⚙️</button>
         <button class="iconBtn" id="btnSave" type="button" title="Save">💾</button>
-        <button class="iconBtn" id="btnLoad" type="button" title="Load">⬇️</button>
+        <button class="iconBtn" id="btnSettings" type="button" title="Settings">⚙️</button>
         <button class="iconBtn" id="btnReset" type="button" title="Reset">↺</button>
       </div>
     </div>
 
     <div class="hudMid">
-      <div class="pill queuePill" id="queuePill">
+      <div class="pill queuePill">
         <span id="queueText">Queue: 0/2</span>
         <span id="timerText">Timers: ON</span>
       </div>
@@ -406,17 +360,17 @@
     <div class="hudBottom">
       <button class="bigBtn" id="btnCity" type="button">City</button>
       <button class="bigBtn" id="btnWorld" type="button">World</button>
-      <button class="bigBtn primary" id="btnBuild" type="button">Build</button>
+      <!-- no Build button: tap plots to build/upgrade -->
     </div>
   </div>
 
-  <!-- PANELS -->
-  <div id="panels">
+  <!-- UI PANELS -->
+  <div id="uiFixed">
     <div id="buildPopup" class="uiPanel">
       <div id="buildTitle">Build</div>
       <div id="buildGrid"></div>
       <div class="row">
-        <button id="buildClose" class="closeBtn" type="button" data-action="build-close">Close</button>
+        <button id="buildClose" class="closeBtn" type="button">Close</button>
       </div>
     </div>
 
@@ -425,7 +379,7 @@
     <div id="settingsPanel" class="uiPanel">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <div style="font-weight:900; font-size:14px;">Settings</div>
-        <button class="closeBtn" type="button" data-action="settings-close">Close</button>
+        <button id="settingsClose" class="closeBtn" type="button">Close</button>
       </div>
 
       <div class="setRow">
@@ -436,8 +390,12 @@
         <span id="timersStateText" style="opacity:.85; font-weight:900;">ON</span>
       </div>
 
-      <button class="neutralBtn" type="button" data-action="timers-finish-now">
+      <button id="finishTimersNow" class="neutralBtn" type="button">
         Finish any active timers now
+      </button>
+
+      <button id="btnLoad" class="neutralBtn" type="button">
+        Load
       </button>
 
       <div class="setHint">
@@ -449,94 +407,263 @@
   <script type="module">
     import { CITY_PLOTS } from "./js/plots.city.js";
     import { BUILDINGS } from "./js/data/buildingCatalog.js";
-    import { createCityBuildingsSystem } from "./js/systems/cityBuildings.js";
     import { state } from "./js/state.js";
     import { updateEconomy, getProductionPerSecond } from "./js/systems/cityEconomy.js";
 
-    import {
-      processTrainingQueues,
-      getTrainingSnapshot,
-      startTrainingInSlot,
-      cancelTraining,
-      syncBarracksSlots
-    } from "./js/systems/trainingSystems.js";
-
-    import { TROOPS, BARRACKS_TIER_UNLOCK } from "./js/data/troopsCatalog.js";
-
     const BASE_MAP_SRC = "./assets/maps/city/city_tilemap_base.png";
     const BUILDING_BASE_PATH = "./assets/city";
+
     const SAVE_KEY = "empire_city_save_v1";
     const PENDING_KEY = "EMPIRE_PENDING_LOAD";
 
-    state.settings ??= {};
-    if (typeof state.settings.timersEnabled !== "boolean") state.settings.timersEnabled = true;
+    let userInteracted = false;
+    window.addEventListener("pointerdown", () => { userInteracted = true; }, { once:true, passive:true });
 
-    // Ensure resources exist
-    state.resources ??= {};
-    state.resources.food  ??= 0;
-    state.resources.wood  ??= 0;
-    state.resources.stone ??= 0;
-    state.resources.ore   ??= 0;
-    state.resources.gold  ??= 0;
+    async function importFirst(paths){
+      let lastErr = null;
+      for (const p of paths){
+        try { return await import(p); }
+        catch(e){ lastErr = e; }
+      }
+      console.error("Failed imports:", paths, lastErr);
+      throw lastErr || new Error("Import failed");
+    }
+
+    const cityBuildingsMod = await importFirst([
+      "./js/systems/cityBuildings.js",
+      "./js/systems/citybuildings.js"
+    ]);
+
+    const createBuildingsSystem =
+      cityBuildingsMod.createCityBuildingsSystem ||
+      cityBuildingsMod.createcitybuildingsSystem ||
+      cityBuildingsMod.default;
+
+    if (!createBuildingsSystem) throw new Error("No createCityBuildingsSystem export found in cityBuildings.js");
+
+    let trainingMod = null;
+    try{
+      trainingMod = await importFirst([
+        "./js/systems/trainingSystems.js",
+        "./js/systems/trainingsystems.js",
+        "./js/systems/trainingSystems.js",
+        "./js/systems/trainingsystems.js"
+      ]);
+    }catch(e){
+      trainingMod = {};
+    }
+
+    const processTrainingQueues = trainingMod.processTrainingQueues || (()=>{});
+    const getTrainingSnapshot   = trainingMod.getTrainingSnapshot   || (()=>({}));
+    const startTrainingInSlot   = trainingMod.startTrainingInSlot   || (()=>({ ok:false, reason:"Training system missing" }));
+    const cancelTraining        = trainingMod.cancelTraining        || (()=>({ ok:false, reason:"Training system missing" }));
+    const syncBarracksSlots     = trainingMod.syncBarracksSlots     || (()=>{});
+
+    let troopsMod = null;
+    try{
+      troopsMod = await importFirst([
+        "./js/data/troopsCatalog.js"
+      ]);
+    }catch(e){
+      troopsMod = { TROOPS:{}, BARRACKS_TIER_UNLOCK:{} };
+    }
+    const TROOPS = troopsMod.TROOPS || {};
+    const BARRACKS_TIER_UNLOCK = troopsMod.BARRACKS_TIER_UNLOCK || {};
+
+    function ensureResKeys(){
+      state.resources ??= {};
+      state.resources.food  ??= 0;
+      state.resources.wood  ??= 0;
+      state.resources.stone ??= 0;
+      state.resources.ore   ??= 0;
+      state.resources.gold  ??= 0;
+    }
+    ensureResKeys();
 
     state.buildings ??= {};
     state.buildings.levels ??= {};
+    state.settings ??= {};
+    if (typeof state.settings.timersEnabled !== "boolean") state.settings.timersEnabled = true;
 
-    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-    function loadImage(src){
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = src;
-      });
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+    const elFood  = document.getElementById("r_food");
+    const elWood  = document.getElementById("r_wood");
+    const elStone = document.getElementById("r_stone");
+    const elOre   = document.getElementById("r_ore");
+    const elGold  = document.getElementById("r_gold");
+    const elQueue = document.getElementById("queueText");
+    const elTimers= document.getElementById("timerText");
+
+    const btnSave     = document.getElementById("btnSave");
+    const btnSettings = document.getElementById("btnSettings");
+    const btnReset    = document.getElementById("btnReset");
+    const btnLoad     = document.getElementById("btnLoad");
+
+    const btnCity  = document.getElementById("btnCity");
+    const btnWorld = document.getElementById("btnWorld");
+
+    const popup        = document.getElementById("buildPopup");
+    const buildTitle   = document.getElementById("buildTitle");
+    const buildGrid    = document.getElementById("buildGrid");
+    const buildClose   = document.getElementById("buildClose");
+
+    const barracksPanel= document.getElementById("barracksPanel");
+
+    const settingsPanel= document.getElementById("settingsPanel");
+    const settingsClose= document.getElementById("settingsClose");
+    const timersToggle = document.getElementById("timersToggle");
+    const timersStateText = document.getElementById("timersStateText");
+    const finishTimersNow = document.getElementById("finishTimersNow");
+
+    function hideAllPanels(){
+      popup.style.display = "none";
+      barracksPanel.style.display = "none";
+      settingsPanel.style.display = "none";
     }
 
-    function inferMapSizeFromPlots(plots, fallbackW = 512, fallbackH = 512){
-      if (!Array.isArray(plots) || !plots.length) return { w: fallbackW, h: fallbackH };
-      let maxX = 0, maxY = 0;
-      for (const p of plots) {
-        const x2 = (Number(p.x) || 0) + (Number(p.w) || 0);
-        const y2 = (Number(p.y) || 0) + (Number(p.h) || 0);
-        if (x2 > maxX) maxX = x2;
-        if (y2 > maxY) maxY = y2;
+    function isOpen(el){
+      return getComputedStyle(el).display !== "none";
+    }
+
+    function centerPanel(panelEl){
+      const pad = 12;
+      const hudTopH = 56;
+      const hudMidH = 44;
+      const hudBotH = 64;
+
+      const safeTop = pad
+        + (Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--pad")) || 12)
+        + (window.visualViewport?.offsetTop || 0)
+        + (hudTopH + hudMidH);
+
+      const safeBot = pad
+        + hudBotH
+        + (window.visualViewport ? (window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop) : 0);
+
+      panelEl.style.display = "block";
+      panelEl.style.visibility = "hidden";
+      panelEl.style.left = "0px";
+      panelEl.style.top  = "0px";
+
+      const pw = panelEl.offsetWidth;
+      const ph = panelEl.offsetHeight;
+
+      panelEl.style.visibility = "visible";
+
+      const x = clamp((window.innerWidth  - pw) / 2, pad, window.innerWidth - pw - pad);
+      const y = clamp((window.innerHeight - ph) / 2, safeTop, window.innerHeight - ph - safeBot);
+
+      panelEl.style.left = `${x}px`;
+      panelEl.style.top  = `${y}px`;
+    }
+
+    function syncSettingsUI(){
+      timersToggle.checked = !!state.settings.timersEnabled;
+      timersStateText.textContent = state.settings.timersEnabled ? "ON" : "OFF";
+      elTimers.textContent = `Timers: ${state.settings.timersEnabled ? "ON" : "OFF"}`;
+    }
+
+    function buildSavePayload(buildings){
+      const placed = [];
+      for (const plot of CITY_PLOTS){
+        const p = buildings.getPlacedOnPlot?.(plot.id);
+        if (!p) continue;
+        placed.push({
+          plotId: plot.id,
+          buildingId: p.buildingId,
+          level: p.level ?? 1,
+          buildStartedAt: p.buildStartedAt ?? 0,
+          buildEndAt: p.buildEndAt ?? 0,
+          upgradeStartedAt: p.upgradeStartedAt ?? 0,
+          upgradeEndAt: p.upgradeEndAt ?? 0,
+          upgradingToLevel: p.upgradingToLevel ?? 0,
+        });
+      }
+
+      return {
+        v: 1,
+        ts: Date.now(),
+        resources: { ...state.resources },
+        settings: { ...state.settings },
+        placed
+      };
+    }
+
+    function saveGame(buildings){
+      const payload = buildSavePayload(buildings);
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      btnSave.textContent = "✅";
+      setTimeout(()=> btnSave.textContent = "💾", 650);
+    }
+
+    function loadGame(){
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return console.warn("No save found.");
+      sessionStorage.setItem(PENDING_KEY, raw);
+      location.reload();
+    }
+
+    function resetSave(){
+      localStorage.removeItem(SAVE_KEY);
+      sessionStorage.removeItem(PENDING_KEY);
+      location.reload();
+    }
+
+    function pointInRect(px, py, r){
+      return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+    }
+
+    function inferMapSizeFromPlots(plots, fallbackW=512, fallbackH=512){
+      let maxX=0, maxY=0;
+      for (const p of plots){
+        const x2 = (Number(p.x)||0) + (Number(p.w)||0);
+        const y2 = (Number(p.y)||0) + (Number(p.h)||0);
+        if (x2>maxX) maxX=x2;
+        if (y2>maxY) maxY=y2;
       }
       return { w: Math.max(fallbackW, Math.ceil(maxX)), h: Math.max(fallbackH, Math.ceil(maxY)) };
     }
 
+    function fmt(n){ return Math.floor(n||0).toLocaleString(); }
+
     function createCityScene(canvas, { baseMapSrc, initialMapSize }) {
-      const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+      const ctx = canvas.getContext("2d", { alpha:false, desynchronized:true });
       ctx.imageSmoothingEnabled = false;
 
-      let buildingsSystem = null;
-      let onPlotClick = null;
-
-      let baseImg = null;
+      let baseImg=null;
       let baseW = initialMapSize?.w ?? 512;
       let baseH = initialMapSize?.h ?? 512;
 
       const cam = { x: baseW/2, y: baseH/2, zoom: 2, minZoom: 1, maxZoom: 6 };
       const sceneState = { plots: [], selectedPlotId: null };
 
+      let worldOverlayRenderer = null;
+      function setWorldOverlayRenderer(fn){
+        worldOverlayRenderer = (typeof fn === "function") ? fn : null;
+      }
+
+      let screenOverlayRenderer = null;
+      function setScreenOverlayRenderer(fn){
+        screenOverlayRenderer = (typeof fn === "function") ? fn : null;
+      }
+
       function resizeCanvas(){
         const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
         const r = canvas.getBoundingClientRect();
         const w = Math.max(1, Math.floor(r.width * dpr));
         const h = Math.max(1, Math.floor(r.height * dpr));
-        if (canvas.width !== w || canvas.height !== h) {
+        if (canvas.width !== w || canvas.height !== h){
           canvas.width = w; canvas.height = h;
           ctx.setTransform(1,0,0,1,0,0);
           ctx.imageSmoothingEnabled = false;
         }
       }
 
-      function worldToScreen(wx, wy){
-        const cx = canvas.width/2, cy = canvas.height/2;
-        return { x:(wx-cam.x)*cam.zoom+cx, y:(wy-cam.y)*cam.zoom+cy };
-      }
-      function screenToWorld(sx, sy){
-        const cx = canvas.width/2, cy = canvas.height/2;
-        return { x:(sx-cx)/cam.zoom+cam.x, y:(sy-cy)/cam.zoom+cam.y };
+      function computeMinZoomToFit(){
+        const zX = canvas.width / baseW;
+        const zY = canvas.height / baseH;
+        return Math.max(zX, zY);
       }
 
       function clampCameraToMap(){
@@ -550,10 +677,13 @@
         else cam.y = clamp(cam.y, viewH/2, baseH - viewH/2);
       }
 
-      function computeMinZoomToFit(){
-        const zX = canvas.width / baseW;
-        const zY = canvas.height / baseH;
-        return Math.max(zX, zY);
+      function worldToScreen(wx, wy){
+        const cx = canvas.width/2, cy = canvas.height/2;
+        return { x:(wx-cam.x)*cam.zoom+cx, y:(wy-cam.y)*cam.zoom+cy };
+      }
+      function screenToWorld(sx, sy){
+        const cx = canvas.width/2, cy = canvas.height/2;
+        return { x:(sx-cx)/cam.zoom+cam.x, y:(sy-cy)/cam.zoom+cam.y };
       }
 
       function zoomAt(delta, sx, sy){
@@ -574,53 +704,52 @@
         };
       }
 
-      function pointInRect(px, py, r){
-        return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
-      }
       function pickPlot(wx, wy){
-        for (let i = sceneState.plots.length - 1; i >= 0; i--) {
+        for (let i = sceneState.plots.length - 1; i >= 0; i--){
           const p = sceneState.plots[i];
           if (pointInRect(wx, wy, p)) return p;
         }
         return null;
       }
 
-      function firePickAtScreen(sx, sy){
+      function firePickAtScreen(sx, sy, onPlotClick){
         const w = screenToWorld(sx, sy);
         const hit = pickPlot(w.x, w.y);
         sceneState.selectedPlotId = hit ? hit.id : null;
-
-        if (hit && typeof onPlotClick === "function") {
-          onPlotClick(hit);
-        }
+        if (hit && typeof onPlotClick === "function") onPlotClick(hit);
       }
 
       const pointers = new Map();
-      let isPanning = false;
-      let panStart = { x:0, y:0, camX:0, camY:0 };
-      let down = null;
-      let pinchStart = null;
+      let isPanning=false;
+      let panStart={x:0,y:0,camX:0,camY:0};
+      let down=null;
+      let pinchStart=null;
+
       const TAP_MOVE_PX = 10;
       const dist = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
       const mid  = (a,b)=>({ x:(a.x+b.x)/2, y:(a.y+b.y)/2 });
 
-      canvas.addEventListener("wheel", (e) => {
+      canvas.addEventListener("wheel", (e)=>{
         e.preventDefault();
         const p = eventToCanvasXY(e);
         const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
         zoomAt(factor, p.x, p.y);
       }, { passive:false });
 
-      canvas.addEventListener("pointerdown", (e) => {
+      let onPlotClick = null;
+      function setOnPlotClick(fn){ onPlotClick = fn; }
+
+      canvas.addEventListener("pointerdown", (e)=>{
+        userInteracted = true;
         canvas.setPointerCapture(e.pointerId);
         const p = eventToCanvasXY(e);
         pointers.set(e.pointerId, p);
 
-        if (pointers.size === 1) {
+        if (pointers.size === 1){
           isPanning = true;
           panStart = { x:p.x, y:p.y, camX:cam.x, camY:cam.y };
           down = { x:p.x, y:p.y, time:performance.now(), moved:false, multi:false };
-        } else if (pointers.size === 2) {
+        } else if (pointers.size === 2){
           const [a,b] = Array.from(pointers.values());
           pinchStart = { dist: dist(a,b), zoom: cam.zoom, mid: mid(a,b) };
           if (down) down.multi = true;
@@ -631,17 +760,17 @@
         }
       }, { passive:true });
 
-      canvas.addEventListener("pointermove", (e) => {
+      canvas.addEventListener("pointermove", (e)=>{
         if (!pointers.has(e.pointerId)) return;
         const p = eventToCanvasXY(e);
         pointers.set(e.pointerId, p);
 
-        if (pointers.size === 1 && isPanning) {
+        if (pointers.size === 1 && isPanning){
           cam.x = panStart.camX - (p.x - panStart.x) / cam.zoom;
           cam.y = panStart.camY - (p.y - panStart.y) / cam.zoom;
           clampCameraToMap();
           if (down && !down.moved && Math.hypot(p.x-down.x, p.y-down.y) > TAP_MOVE_PX) down.moved = true;
-        } else if (pointers.size === 2 && pinchStart) {
+        } else if (pointers.size === 2 && pinchStart){
           const [a,b] = Array.from(pointers.values());
           const d = dist(a,b);
           const scale = pinchStart.dist ? (d / pinchStart.dist) : 1;
@@ -659,110 +788,96 @@
         }
       }, { passive:true });
 
-      canvas.addEventListener("pointerup", (e) => {
+      canvas.addEventListener("pointerup", (e)=>{
         const p = eventToCanvasXY(e);
         pointers.delete(e.pointerId);
 
         const wasTap = down && !down.moved && !down.multi;
         const recent = down && (performance.now() - down.time) < 650;
-        if (wasTap && recent) firePickAtScreen(p.x, p.y);
 
-        if (pointers.size === 1) {
+        if (wasTap && recent) firePickAtScreen(p.x, p.y, onPlotClick);
+
+        if (pointers.size === 1){
           const only = Array.from(pointers.values())[0];
           isPanning = true;
-          panStart = { x: only.x, y: only.y, camX: cam.x, camY: cam.y };
+          panStart = { x:only.x, y:only.y, camX:cam.x, camY:cam.y };
         } else {
-          isPanning = false;
-          pinchStart = null;
+          isPanning=false;
+          pinchStart=null;
         }
-        down = null;
+        down=null;
       }, { passive:true });
 
-      canvas.addEventListener("pointercancel", () => {
+      canvas.addEventListener("pointercancel", ()=>{
         pointers.clear();
-        isPanning = false;
-        pinchStart = null;
-        down = null;
+        isPanning=false;
+        pinchStart=null;
+        down=null;
       }, { passive:true });
 
       (function quickInit(){
         resizeCanvas();
-        cam.x = baseW / 2;
-        cam.y = baseH / 2;
+        cam.x = baseW/2; cam.y = baseH/2;
         cam.minZoom = computeMinZoomToFit();
         cam.zoom = Math.max(cam.zoom, cam.minZoom);
         clampCameraToMap();
       })();
 
+      function loadImage(src){
+        return new Promise((resolve,reject)=>{
+          const img = new Image();
+          img.onload=()=>resolve(img);
+          img.onerror=reject;
+          img.src=src;
+        });
+      }
+
       (async function init(){
-        try {
+        try{
           baseImg = await loadImage(baseMapSrc);
           baseW = baseImg.width; baseH = baseImg.height;
           cam.x = baseW/2; cam.y = baseH/2;
           cam.minZoom = computeMinZoomToFit();
           cam.zoom = Math.max(cam.zoom, cam.minZoom);
           clampCameraToMap();
-        } catch (err) {
-          console.error("City init failed:", err);
+        }catch(e){
+          console.warn("Base map load failed:", e);
         }
       })();
 
       function drawBase(){
         const cx = canvas.width/2, cy = canvas.height/2;
-
         ctx.setTransform(1,0,0,1,0,0);
         ctx.fillStyle = "#0f1220";
         ctx.fillRect(0,0,canvas.width,canvas.height);
 
         ctx.setTransform(cam.zoom, 0, 0, cam.zoom, cx - cam.x*cam.zoom, cy - cam.y*cam.zoom);
         ctx.imageSmoothingEnabled = false;
-
         if (baseImg) ctx.drawImage(baseImg, 0, 0);
-      }
 
-      function drawPlacedBuildings() {
-        if (!buildingsSystem) return;
-        const placed = buildingsSystem.getAllPlaced?.() || [];
-        if (!placed.length) return;
-
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2;
-        ctx.setTransform(cam.zoom, 0, 0, cam.zoom, cx - cam.x * cam.zoom, cy - cam.y * cam.zoom);
-        ctx.imageSmoothingEnabled = false;
-
-        for (const b of placed) {
-          const plot = sceneState.plots.find(p => p.id === b.plotId);
-          if (!plot) continue;
-
-          const ax = plot.x + plot.w / 2;
-          const ay = plot.y + plot.h;
-
-          ctx.drawImage(
-            b.img,
-            Math.round(ax - b.w / 2),
-            Math.round(ay - b.h),
-            b.w,
-            b.h
-          );
+        if (worldOverlayRenderer){
+          worldOverlayRenderer(ctx, {
+            cam: { ...cam },
+            map: { w: baseW, h: baseH },
+            worldToScreen,
+            screenToWorld,
+          });
         }
       }
 
       function drawPlotsOverlay(){
         ctx.setTransform(1,0,0,1,0,0);
-        for (const p of sceneState.plots) {
+        for (const p of sceneState.plots){
           const a = worldToScreen(p.x, p.y);
           const b = worldToScreen(p.x+p.w, p.y+p.h);
-
           const x = Math.min(a.x,b.x), y = Math.min(a.y,b.y);
           const w = Math.abs(b.x-a.x), h = Math.abs(b.y-a.y);
-
           const sel = p.id === sceneState.selectedPlotId;
           ctx.lineWidth = sel ? 3 : 2;
-          ctx.strokeStyle = sel ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)";
+          ctx.strokeStyle = sel ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.20)";
           ctx.strokeRect(x,y,w,h);
-
-          if (sel) {
-            ctx.fillStyle = "rgba(255,255,255,0.08)";
+          if (sel){
+            ctx.fillStyle = "rgba(255,255,255,0.06)";
             ctx.fillRect(x,y,w,h);
           }
         }
@@ -770,91 +885,738 @@
 
       return {
         setPlots(plots){ sceneState.plots = plots; },
-        setBuildingsSystem(sys){ buildingsSystem = sys; },
         setOnPlotClick(fn){ onPlotClick = fn; },
-        update(){ resizeCanvas(); cam.minZoom = computeMinZoomToFit(); clampCameraToMap(); },
-        render(){ drawBase(); drawPlacedBuildings(); drawPlotsOverlay(); }
+        setWorldOverlayRenderer,
+        setScreenOverlayRenderer,
+        update(){
+          resizeCanvas();
+          cam.minZoom = computeMinZoomToFit();
+          clampCameraToMap();
+        },
+        render(){
+          drawBase();
+          drawPlotsOverlay();
+
+          if (screenOverlayRenderer){
+            ctx.setTransform(1,0,0,1,0,0);
+            screenOverlayRenderer(ctx);
+          }
+        }
       };
     }
 
-    // ===== DOM refs =====
+    const buildings = createBuildingsSystem({ basePath: BUILDING_BASE_PATH });
+
+    function getPlaced(plotId){ return buildings.getPlacedOnPlot?.(plotId) || null; }
+    function getStatus(plotId){ return buildings.getStatus?.(plotId) || null; }
+    function canBuild(buildingId){ return buildings.canBuildBuilding?.(buildingId) ?? { ok:true }; }
+    function canUpgrade(plotId){ return buildings.canUpgradePlot?.(plotId) ?? { ok:true }; }
+    async function placeBuilding(plotId, buildingId){ return await buildings.placeBuildingOnPlot(plotId, buildingId, 1); }
+    async function upgradePlot(plotId){ return await buildings.upgradePlot(plotId); }
+    function getQueueInfo(){ return buildings.getBuildQueueInfo?.() || { active:0, max:2, full:false }; }
+
+    function hasTownhall(){
+      if (buildings.getByBuildingId) return !!buildings.getByBuildingId("townhall");
+      for (const plot of CITY_PLOTS){
+        const p = buildings.getPlacedOnPlot?.(plot.id);
+        if (p?.buildingId === "townhall") return true;
+      }
+      return false;
+    }
+
+    async function ensureTownhallHard(){
+      await buildings.ensureTownhall?.();
+      if (hasTownhall()) return;
+
+      const thPlotId =
+        CITY_PLOTS.find(p => p.id === "plot_4")?.id ??
+        CITY_PLOTS[0]?.id;
+
+      if (thPlotId && buildings.placeBuildingOnPlot){
+        await buildings.placeBuildingOnPlot(thPlotId, "townhall", 1);
+      }
+    }
+
     const canvas = document.getElementById("cityCanvas");
-
-    const popup = document.getElementById("buildPopup");
-    const buildTitle = document.getElementById("buildTitle");
-    const buildGrid = document.getElementById("buildGrid");
-
-    const barracksPanel = document.getElementById("barracksPanel");
-    const settingsPanel = document.getElementById("settingsPanel");
-
-    const timersToggle = document.getElementById("timersToggle");
-    const timersStateText = document.getElementById("timersStateText");
-
-    const r_food  = document.getElementById("r_food");
-    const r_wood  = document.getElementById("r_wood");
-    const r_stone = document.getElementById("r_stone");
-    const r_ore   = document.getElementById("r_ore");
-    const r_gold  = document.getElementById("r_gold");
-    const r_th    = document.getElementById("r_th");
-    const queueText = document.getElementById("queueText");
-    const timerText = document.getElementById("timerText");
-
-    const btnSettings = document.getElementById("btnSettings");
-    const btnSave = document.getElementById("btnSave");
-    const btnLoad = document.getElementById("btnLoad");
-    const btnReset = document.getElementById("btnReset");
-
-    // ===== Scene + Systems =====
     const inferred = inferMapSizeFromPlots(CITY_PLOTS, 512, 512);
     const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC, initialMapSize: inferred });
     scene.setPlots(CITY_PLOTS);
 
-    const buildings = createCityBuildingsSystem({ basePath: BUILDING_BASE_PATH });
-    scene.setBuildingsSystem(buildings);
+    // ---------- Shared sun state (keeps shadows + tint aligned) ----------
+    function getSunState(t, periodMs = 90000){
+      const phase01 = (t % periodMs) / periodMs;
+      const theta = phase01 * Math.PI * 2;
 
-    // ===== Helpers =====
-    function clampNum(v, a, b) {
-      v = Number(v);
-      if (!Number.isFinite(v)) return a;
-      return Math.max(a, Math.min(b, v));
+      const eastWest = Math.sin(theta);   // -1..+1
+      const altitude = Math.cos(theta);   // +1 high, 0 horizon, -1 night
+
+      const day = Math.max(0, altitude);
+      const night = Math.max(0, -altitude);
+
+      const noonness = day;
+      const sunX01 = (eastWest + 1) / 2;
+
+      const horiz = -eastWest;
+      const vert = 0.16 + 0.24 * (1 - day);
+
+      const sunLenBase = 0.55 + 0.95 * (1 - day);
+
+      return {
+        phase01,
+        theta,
+        eastWest,
+        altitude,
+        day,
+        night,
+        noonness,
+        sunX01,
+        sunDir: { x: horiz, y: vert },
+        sunLenBase
+      };
     }
 
-function centerPanelOnScreen(panelEl){
-  const pad = 12;
+    // ---------- Assets helpers ----------
+    const buildingImageCache = new Map();
+    function getBuildingImageAny(srcList){
+      const key = srcList.join("|");
+      if (buildingImageCache.has(key)) return buildingImageCache.get(key);
 
-  const hud = document.getElementById("hudFixed");
-  const topH = hud?.querySelector(".hudTop")?.getBoundingClientRect().height || 0;
-  const midH = hud?.querySelector(".hudMid")?.getBoundingClientRect().height || 0;
-  const botH = hud?.querySelector(".hudBottom")?.getBoundingClientRect().height || 0;
+      const img = new Image();
+      let i = 0;
+      img.onerror = ()=>{
+        i++;
+        if (i < srcList.length) img.src = srcList[i];
+      };
+      img.src = srcList[i];
+      buildingImageCache.set(key, img);
+      return img;
+    }
 
-  const safeTop = pad + topH + midH;
-  const safeBot = pad + botH;
+    function resolveBuildingSpriteCandidates(buildingId, level){
+      const def = BUILDINGS?.[buildingId];
+      const fileBase = def?.fileBase || buildingId;
+      const base = BUILDING_BASE_PATH.replace(/\/+$/, "");
+      const lv = Number(level || 1);
 
-  panelEl.style.display = "block";
-  panelEl.style.visibility = "hidden";
-  panelEl.style.left = "0px";
-  panelEl.style.top  = "0px";
+      return [
+        `${base}/${fileBase}_L${lv}.png`,
+        `${base}/${fileBase}_L1.png`,
+        `${base}/${buildingId}_L${lv}.png`,
+        `${base}/${buildingId}_L1.png`,
+      ];
+    }
+// ---------- Clouds (cheap, no images) ----------
+// ---------- Clouds (cheap, no images) ----------
+function makeCloudTile(size = 256, ink = "light"){
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d");
 
-  const pw = panelEl.offsetWidth;
-  const ph = panelEl.offsetHeight;
+  g.clearRect(0, 0, size, size);
 
-  panelEl.style.visibility = "visible";
+  const blobCount = 46;
+  for (let i = 0; i < blobCount; i++){
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 26 + Math.random() * 78;
 
-  const x = Math.max(pad, Math.min(window.innerWidth  - pw - pad, (window.innerWidth  - pw)/2));
-  const y = Math.max(safeTop, Math.min(window.innerHeight - ph - safeBot, (window.innerHeight - ph)/2));
+    const a0 = ink === "dark" ? (0.10 + Math.random() * 0.14) : (0.18 + Math.random() * 0.22);
+    const grd = g.createRadialGradient(x, y, 0, x, y, r);
+    grd.addColorStop(0, ink === "dark" ? `rgba(0,0,0,${a0})` : `rgba(255,255,255,${a0})`);
+    grd.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = grd;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
 
-  panelEl.style.left = `${x}px`;
-  panelEl.style.top  = `${y}px`;
+  return c;
 }
 
+// two tiles: one for visible clouds, one for shadow mask
+const cloudTileLight = makeCloudTile(256, "light");
+const cloudTileDark  = makeCloudTile(256, "dark");
 
-    function syncSettingsUI(){
-      timersToggle.checked = !!state.settings.timersEnabled;
-      timersStateText.textContent = state.settings.timersEnabled ? "ON" : "OFF";
-      timerText.textContent = "Timers: " + (state.settings.timersEnabled ? "ON" : "OFF");
+
+const cloudTile = makeCloudTile(256);
+
+function drawTiled(ctx, tile, w, h, ox, oy){
+  const tw = tile.width, th = tile.height;
+  const startX = -tw + ((-ox % tw) + tw) % tw;
+  const startY = -th + ((-oy % th) + th) % th;
+
+  for (let y = startY; y < h + th; y += th){
+    for (let x = startX; x < w + tw; x += tw){
+      ctx.drawImage(tile, x, y);
+    }
+  }
+}
+
+/**
+ * World-space shadows: call while ctx is in WORLD transform (after base map draw).
+ */
+function drawCloudShadowsWorld(ctx, mapW, mapH, t, strength = 1){
+  if (strength <= 0.001) return;
+
+  const speedX = 0.010; // world units/ms (tuned to feel slow)
+  const speedY = 0.004;
+
+  const ox = t * speedX;
+  const oy = t * speedY;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = 0.13 * strength;
+
+  // Slight cool tint in shadow (not pure black)
+  ctx.fillStyle = "rgba(160,190,255,1)";
+  // Use tile alpha as mask by drawing the tile itself
+  drawTiled(ctx, cloudTileDark, mapW, mapH, ox, oy);
+
+  // Second layer for depth (different speed/scale)
+  ctx.globalAlpha = 0.07 * strength;
+ drawTiled(ctx, cloudTileDark, mapW, mapH, ox * 1.7 + 120, oy * 1.3 + 60);
+
+  ctx.restore();
+}
+
+/**
+ * Screen-space clouds: call in SCREEN overlay (identity transform).
+ */
+function drawCloudsScreen(ctx, t, strength = 1){
+  if (strength <= 0.001) return;
+
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+
+  const speedX = 0.022; // px/ms
+  const speedY = 0.010;
+
+  const ox = t * speedX;
+  const oy = t * speedY;
+
+  ctx.save();
+
+  // Soft bright clouds
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.10 * strength;
+  drawTiled(ctx, cloudTileLight, w, h, ox, oy);
+
+  // Add a softer contrast pass
+  ctx.globalCompositeOperation = "soft-light";
+  ctx.globalAlpha = 0.10 * strength;
+  drawTiled(ctx, cloudTileLight, w, h, ox * 0.65 + 90, oy * 0.55 + 40);
+
+  ctx.restore();
+}
+
+    // ---------- Wind shimmer ----------
+    function makeNoiseTile(size = 192){
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      const n = c.getContext("2d");
+
+      const img = n.createImageData(size, size);
+      for (let i = 0; i < img.data.length; i += 4){
+        const v = (Math.random() * 255) | 0;
+        img.data[i]   = (v * 0.55) | 0;        // R
+        img.data[i+1] = Math.min(255, v + 35); // G
+        img.data[i+2] = (v * 0.55) | 0;        // B
+        img.data[i+3] = (Math.random() * 120) | 0; // A
+      }
+      n.putImageData(img, 0, 0);
+      return c;
     }
 
-    function fmt(n){ return Math.floor(n || 0).toLocaleString(); }
+    const grassNoise = makeNoiseTile(192);
+
+    function drawGrassWind(ctx, mapW, mapH, t){
+      const tile = grassNoise;
+      const tw = tile.width;
+      const th = tile.height;
+
+      const ox = (t * 0.018) % tw;
+      const oy = (t * 0.011) % th;
+
+      ctx.save();
+
+      ctx.globalCompositeOperation = "soft-light";
+      ctx.globalAlpha = 0.16;
+
+      for (let y = -th; y < mapH + th; y += th){
+        for (let x = -tw; x < mapW + tw; x += tw){
+          ctx.drawImage(tile, x - ox, y - oy);
+        }
+      }
+
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.06;
+
+      const gustCount = 12;
+      const baseY = (Math.sin(t * 0.00055) * 0.5 + 0.5) * mapH;
+
+      for (let i = 0; i < gustCount; i++){
+        const phase = t * 0.00025 + i * 0.9;
+
+        const gx = ((phase * 220) + i * 180) % (mapW + 260) - 130;
+        const gy = baseY + Math.sin(phase * 1.6) * 120 + (i - gustCount/2) * 18;
+
+        const rx = 140 + (i % 3) * 40;
+        const ry = 70  + (i % 4) * 18;
+
+        const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, rx);
+        grad.addColorStop(0, "rgba(200,255,210,0.95)");
+        grad.addColorStop(1, "rgba(200,255,210,0)");
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(gx, gy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      ctx.restore();
+    }
+   
+
+// ---------- Night Fireflies (cheap particles) ----------
+let fireflies = [];
+let firefliesViewportKey = "";
+
+function rand01(seed){
+  // deterministic-ish pseudo random 0..1 from seed
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+function ensureFireflies(w, h){
+  const key = `${w}x${h}`;
+  if (key === firefliesViewportKey && fireflies.length) return;
+
+  firefliesViewportKey = key;
+  fireflies = [];
+
+  const count = 55; // cheap; bump to 80 if you want more
+  for (let i = 0; i < count; i++){
+    const s = i * 999.123;
+    fireflies.push({
+      x: rand01(s + 1.1) * w,
+      y: (0.20 + rand01(s + 2.2) * 0.65) * h, // avoid HUD-ish top/bottom a bit
+      r: 0.8 + rand01(s + 3.3) * 1.8,
+      vx: -0.015 + rand01(s + 4.4) * 0.03,
+      vy: -0.010 + rand01(s + 5.5) * 0.02,
+      tw: 1200 + rand01(s + 6.6) * 2400,
+      ph: rand01(s + 7.7) * Math.PI * 2,
+    });
+  }
+}
+
+function drawFireflies(ctx, night, t){
+  if (night <= 0.001) return;
+
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  ensureFireflies(w, h);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.90 * night;
+
+  for (const f of fireflies){
+    const tt = (t / f.tw) + f.ph;
+
+    // drift + gentle bob
+    let x = f.x + (t * f.vx);
+    let y = f.y + (t * f.vy) + Math.sin(tt * 2.2) * 6;
+
+    // wrap
+    x = ((x % (w + 40)) + (w + 40)) - 20;
+    y = ((y % (h + 40)) + (h + 40)) - 20;
+
+    // flicker
+    const flick = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(tt * 6.0));
+    const r = f.r * (0.8 + 0.6 * flick);
+
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 7);
+    g.addColorStop(0, `rgba(190,255,210,${1.00 * flick})`);
+    g.addColorStop(0.35, `rgba(190,255,210,${0.35 * flick})`);
+    g.addColorStop(1, "rgba(190,255,210,0)");
+
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ---------- Moon highlights on buildings (cheap “specular”) ----------
+function drawMoonHighlights(ctx, rect, moonX, strength){
+  if (strength <= 0.001) return;
+
+  const { x, y, w, h } = rect;
+
+  // highlight comes from the moon side (left/right), fades across sprite
+  const fromLeft = moonX < (x + w * 0.5);
+
+  const x0 = fromLeft ? x - w * 0.10 : x + w * 1.10;
+  const x1 = fromLeft ? x + w * 0.55 : x + w * 0.45;
+
+  const g = ctx.createLinearGradient(x0, y, x1, y);
+  g.addColorStop(0, `rgba(140,185,255,0)`);
+  g.addColorStop(0.25, `rgba(150,200,255,${0.28 * strength})`);
+  g.addColorStop(1, `rgba(140,185,255,0)`);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.65 * strength;
+
+  // clip to sprite rect (cheap silhouette-ish)
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+
+  ctx.restore();
+}
+
+    // ---------- World overlay: wind + (sun shadows day only) + (moon shadows night) + buildings ----------
+    scene.setWorldOverlayRenderer((ctx, helpers)=>{
+      const t = performance.now();
+      const mapW = helpers?.map?.w ?? 512;
+      const mapH = helpers?.map?.h ?? 512;
+
+      const s = getSunState(t, 90000);
+
+      // Sun shadows only above horizon; smooth fade in/out near horizon.
+      const sunShadowStrength = clamp((s.altitude - 0.08) / 0.22, 0, 1);
+
+      // Moon is opposite the sun; only at night; also fades near horizon.
+      const moonAltitude = Math.max(0, -s.altitude);
+      const moonShadowStrength = clamp((moonAltitude - 0.08) / 0.22, 0, 1) * s.night;
+
+      const sunDir = s.sunDir;
+      const sunLenBase = s.sunLenBase;
+      const noonness = s.noonness;
+
+      // Moon direction: opposite sun position; shadow goes away from moon
+      const moonDir = { x: s.eastWest, y: 0.28 };
+      const moonLenBase = 0.55 + 0.55 * (1 - moonAltitude); // shorter when moon "high"
+
+      drawGrassWind(ctx, mapW, mapH, t);
+      drawCloudShadowsWorld(ctx, mapW, mapH, t, 0.85 * (0.35 + 0.65 * s.day));
+
+      for (const plot of CITY_PLOTS){
+        const placed = buildings.getPlacedOnPlot?.(plot.id);
+        if (!placed) continue;
+
+        const def = BUILDINGS?.[placed.buildingId];
+        const level = placed.level ?? 1;
+
+        const pad = Math.max(1, Math.floor(Math.min(plot.w, plot.h) * 0.08));
+        const x = plot.x + pad;
+        const y = plot.y + pad;
+        const w = Math.max(2, plot.w - pad * 2);
+        const h = Math.max(2, plot.h - pad * 2);
+
+        const img = getBuildingImageAny(resolveBuildingSpriteCandidates(placed.buildingId, level));
+        const okToDrawImage = img && img.complete && img.naturalWidth > 0;
+
+        if (!okToDrawImage){
+          ctx.fillStyle = "rgba(255,255,255,0.10)";
+          ctx.fillRect(x, y, w, h);
+          ctx.strokeStyle = "rgba(255,255,255,0.25)";
+          ctx.lineWidth = 2 / (ctx.getTransform().a || 1);
+          ctx.strokeRect(x, y, w, h);
+
+          ctx.save();
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.font = `${Math.max(10, Math.floor(10 / (ctx.getTransform().a || 1)))}px system-ui`;
+          ctx.textBaseline = "top";
+          ctx.fillText(`${placed.buildingId} Lv${level}`, x + 4, y + 4);
+          ctx.restore();
+          continue;
+        }
+
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+
+        const overflowY = Number.isFinite(def?.overflowY) ? def.overflowY : 0.55; // 0.35..0.85
+        const shadowWidthMul = Number.isFinite(def?.shadowWidthMul) ? def.shadowWidthMul : 1.0;
+        const shadowLenMul   = Number.isFinite(def?.shadowLenMul) ? def.shadowLenMul : 1.0;
+        const shadowAnchorX  = Number.isFinite(def?.shadowAnchorX) ? def.shadowAnchorX : 0.52;
+
+        const maxW = w;
+        const maxH = h * (1 + overflowY);
+
+        const scale = Math.min(maxW / iw, maxH / ih);
+        const dw = Math.max(1, Math.floor(iw * scale));
+        const dh = Math.max(1, Math.floor(ih * scale));
+
+        const dx = x + Math.floor((w - dw) / 2);
+        const dy = y + (h - dh);
+
+        const feetY = y + h;
+        const feetX = dx + dw * shadowAnchorX;
+
+        // ----- SUN SHADOWS (day only) -----
+        if (sunShadowStrength > 0.001){
+          const softness = clamp(1 - s.day, 0, 1); // low sun => softer
+          const shadowLen = Math.max(0, dh * sunLenBase * shadowLenMul * sunShadowStrength);
+          const shadowW0  = Math.max(10, dw * 0.70 * shadowWidthMul);
+          const shadowW1  = shadowW0 * (0.35 + 0.20 * noonness);
+
+          const sx = sunDir.x * shadowLen;
+          const sy = sunDir.y * shadowLen;
+
+          ctx.save();
+          ctx.globalCompositeOperation = "multiply";
+
+          // core shadow
+          ctx.globalAlpha = 0.22 * sunShadowStrength;
+          ctx.beginPath();
+          ctx.moveTo(feetX - shadowW0 * 0.50, feetY);
+          ctx.lineTo(feetX + shadowW0 * 0.50, feetY);
+          ctx.lineTo(feetX + shadowW1 * 0.50 + sx, feetY + sy);
+          ctx.lineTo(feetX - shadowW1 * 0.50 + sx, feetY + sy);
+          ctx.closePath();
+          ctx.fillStyle = "rgba(0,0,0,1)";
+          ctx.fill();
+
+          // soft edge
+          ctx.globalAlpha = (0.06 + 0.10 * softness) * sunShadowStrength;
+          ctx.beginPath();
+          ctx.moveTo(feetX - shadowW0 * 0.62, feetY);
+          ctx.lineTo(feetX + shadowW0 * 0.62, feetY);
+          ctx.lineTo(feetX + shadowW1 * 0.72 + sx, feetY + sy);
+          ctx.lineTo(feetX - shadowW1 * 0.72 + sx, feetY + sy);
+          ctx.closePath();
+          ctx.fill();
+
+          // extra feather at very low sun
+          if (softness > 0.35){
+            ctx.globalAlpha = (0.025 + 0.05 * softness) * sunShadowStrength;
+            ctx.beginPath();
+            ctx.moveTo(feetX - shadowW0 * 0.78, feetY);
+            ctx.lineTo(feetX + shadowW0 * 0.78, feetY);
+            ctx.lineTo(feetX + shadowW1 * 0.92 + sx, feetY + sy);
+            ctx.lineTo(feetX - shadowW1 * 0.92 + sx, feetY + sy);
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          ctx.restore();
+        }
+
+        // ----- MOON SHADOWS (night only, subtle) -----
+        if (moonShadowStrength > 0.001){
+          const mSoft = clamp(0.65 + 0.35 * (1 - moonAltitude), 0.65, 1);
+          const mLen = Math.max(0, dh * moonLenBase * (0.75 * shadowLenMul) * moonShadowStrength);
+          const mW0  = Math.max(8, dw * 0.62 * shadowWidthMul);
+          const mW1  = mW0 * 0.42;
+
+          const msx = moonDir.x * mLen;
+          const msy = moonDir.y * mLen;
+
+          ctx.save();
+          ctx.globalCompositeOperation = "multiply";
+
+          // ultra faint core
+          ctx.globalAlpha = 0.065 * moonShadowStrength;
+          ctx.beginPath();
+          ctx.moveTo(feetX - mW0 * 0.50, feetY);
+          ctx.lineTo(feetX + mW0 * 0.50, feetY);
+          ctx.lineTo(feetX + mW1 * 0.50 + msx, feetY + msy);
+          ctx.lineTo(feetX - mW1 * 0.50 + msx, feetY + msy);
+          ctx.closePath();
+          ctx.fillStyle = "rgba(0,0,0,1)";
+          ctx.fill();
+
+          // soft feather
+          ctx.globalAlpha = 0.035 * moonShadowStrength;
+          ctx.beginPath();
+          ctx.moveTo(feetX - mW0 * (0.65 * mSoft), feetY);
+          ctx.lineTo(feetX + mW0 * (0.65 * mSoft), feetY);
+          ctx.lineTo(feetX + mW1 * (0.85 * mSoft) + msx, feetY + msy);
+          ctx.lineTo(feetX - mW1 * (0.85 * mSoft) + msx, feetY + msy);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.restore();
+        }
+
+        // draw building
+        ctx.drawImage(img, dx, dy, dw, dh);
+        // Moon specular highlights (night only)
+if (moonShadowStrength > 0.001){
+  const screenMoonX = (helpers?.worldToScreen)
+    ? helpers.worldToScreen(mapW * (0.15 + 0.70 * (1 - s.sunX01)), 0).x
+    : 0;
+
+  drawMoonHighlights(
+    ctx,
+    { x: dx, y: dy, w: dw, h: dh },
+    screenMoonX,
+    moonShadowStrength
+  );
+}
+
+      }
+    });
+
+    // ---------- Screen overlay: sunrise/sunset/night hue + directional glow + moonlight rim ----------
+    scene.setScreenOverlayRenderer((ctx)=>{
+      const t = performance.now();
+      const w = ctx.canvas.width;
+      const h = ctx.canvas.height;
+
+      const s = getSunState(t, 90000);
+
+      const eastWest = s.eastWest;
+      const altitude = s.altitude;
+      const day = s.day;
+      const night = s.night;
+
+      const horizon = 1 - Math.min(1, Math.abs(altitude) / 0.35);
+      const sunrise = horizon * (eastWest < 0 ? 1 : 0) * (1 - day);
+      const sunset  = horizon * (eastWest > 0 ? 1 : 0) * (1 - day);
+
+      const sunX = w * (0.15 + 0.70 * s.sunX01);
+      const sunY = h * 0.18;
+
+      const leanX = sunX + (s.sunDir.x * -1) * (w * 0.08);
+      const leanY = sunY + (s.sunDir.y * -1) * (h * 0.06);
+
+      ctx.save();
+
+      if (night > 0){
+        ctx.globalCompositeOperation = "multiply";
+        ctx.globalAlpha = 0.44 * night;
+        ctx.fillStyle = "rgba(10,18,35,1)";
+        ctx.fillRect(0,0,w,h);
+
+        ctx.globalCompositeOperation = "overlay";
+        ctx.globalAlpha = 0.20 * night;
+        ctx.fillStyle = "rgba(45,85,170,1)";
+        ctx.fillRect(0,0,w,h);
+
+        ctx.globalCompositeOperation = "overlay";
+        ctx.globalAlpha = 0.12 * night;
+        ctx.fillStyle = "rgba(130,140,160,1)";
+        ctx.fillRect(0,0,w,h);
+      }
+
+      if (sunrise > 0){
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.30 * sunrise;
+        const g = ctx.createRadialGradient(leanX, leanY, 0, leanX, leanY, Math.max(w,h) * 0.95);
+        g.addColorStop(0, "rgba(255,210,140,1)");
+        g.addColorStop(0.35, "rgba(255,170,90,0.45)");
+        g.addColorStop(1, "rgba(255,170,90,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,w,h);
+
+        ctx.globalCompositeOperation = "overlay";
+        ctx.globalAlpha = 0.11 * sunrise;
+        ctx.fillStyle = "rgba(255,160,80,1)";
+        ctx.fillRect(0,0,w,h);
+      }
+
+      if (sunset > 0){
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.28 * sunset;
+        const g2 = ctx.createRadialGradient(leanX, leanY, 0, leanX, leanY, Math.max(w,h) * 1.0);
+        g2.addColorStop(0, "rgba(255,185,205,1)");
+        g2.addColorStop(0.35, "rgba(210,120,255,0.42)");
+        g2.addColorStop(1, "rgba(210,120,255,0)");
+        ctx.fillStyle = g2;
+        ctx.fillRect(0,0,w,h);
+
+        ctx.globalCompositeOperation = "overlay";
+        ctx.globalAlpha = 0.11 * sunset;
+        ctx.fillStyle = "rgba(200,120,255,1)";
+        ctx.fillRect(0,0,w,h);
+      }
+
+      if (day > 0){
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.06 * day;
+        ctx.fillStyle = "rgba(255,255,255,1)";
+        ctx.fillRect(0,0,w,h);
+      }
+
+      if (night > 0){
+        const moonX = w * (0.15 + 0.70 * (1 - s.sunX01));
+        const moonY = h * 0.16;
+
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.10 * night;
+
+        const mg = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, Math.max(w,h) * 0.85);
+        mg.addColorStop(0, "rgba(160,190,255,0.65)");
+        mg.addColorStop(0.35, "rgba(120,170,255,0.18)");
+        mg.addColorStop(1, "rgba(120,170,255,0)");
+        ctx.fillStyle = mg;
+        ctx.fillRect(0,0,w,h);
+         drawCloudsScreen(ctx, t, 0.55 + 0.55 * day + 0.25 * night);
+
+      }
+     
+
+      ctx.globalCompositeOperation = "multiply";
+      ctx.globalAlpha = 0.25 + 0.22 * night;
+
+      const v = ctx.createRadialGradient(
+        w*0.5, h*0.5,
+        Math.min(w,h)*0.35,
+        w*0.5, h*0.5,
+        Math.max(w,h)*0.85
+      );
+      v.addColorStop(0, "rgba(0,0,0,0)");
+      v.addColorStop(1, "rgba(0,0,0,1)");
+      ctx.fillStyle = v;
+      ctx.fillRect(0,0,w,h);
+      drawFireflies(ctx, night, t);
+
+      ctx.restore();
+    });
+
+    function refreshHud(){
+      elFood.textContent  = `🍖 ${fmt(state.resources.food)}`;
+      elWood.textContent  = `🪵 ${fmt(state.resources.wood)}`;
+      elStone.textContent = `🪨 ${fmt(state.resources.stone)}`;
+      elOre.textContent   = `⛏️ ${fmt(state.resources.ore)}`;
+      elGold.textContent  = `🪙 ${fmt(state.resources.gold)}`;
+
+      const q = getQueueInfo();
+      elQueue.textContent = `Queue: ${q.active||0}/${q.max||2}`;
+      elTimers.textContent = `Timers: ${state.settings.timersEnabled ? "ON" : "OFF"}`;
+    }
+
+    let currentPlot = null;
+
+    function fmtCostPretty(cost){
+      if (!cost) return "?";
+      const parts=[];
+      if (cost.food)  parts.push(`F:${cost.food}`);
+      if (cost.wood)  parts.push(`W:${cost.wood}`);
+      if (cost.stone) parts.push(`S:${cost.stone}`);
+      if (cost.ore)   parts.push(`O:${cost.ore}`);
+      if (cost.gold)  parts.push(`G:${cost.gold}`);
+      return parts.join("  ") || "?";
+    }
+
+    function canAfford(cost){
+      if (!cost) return true;
+      for (const k in cost){
+        const need = Number(cost[k]||0);
+        if (need<=0) continue;
+        if ((state.resources?.[k]||0) < need) return false;
+      }
+      return true;
+    }
 
     function fmtDuration(ms){
       const totalSec = Math.max(0, Math.ceil(ms / 1000));
@@ -862,136 +1624,49 @@ function centerPanelOnScreen(panelEl){
       const h = Math.floor((totalSec % 86400) / 3600);
       const m = Math.floor((totalSec % 3600) / 60);
       const s = totalSec % 60;
-      if (d > 0) return `${d}d ${h}h ${m}m`;
-      if (h > 0) return `${h}h ${m}m`;
-      if (m > 0) return `${m}m ${s}s`;
+      if (d>0) return `${d}d ${h}h ${m}m`;
+      if (h>0) return `${h}h ${m}m`;
+      if (m>0) return `${m}m ${s}s`;
       return `${s}s`;
     }
 
-    function hasBuilding(buildingId){
-      const all = buildings.getAllPlaced?.() || [];
-      return all.some(b => b.buildingId === buildingId);
-    }
+    function openBuildPopupForPlot(plot){
+      currentPlot = plot;
+      const existing = getPlaced(plot.id);
+      const st = getStatus(plot.id);
 
-    function isResourceUnlocked(res) {
-      if (res === "stone") return hasBuilding("quarry");
-      if (res === "ore")   return hasBuilding("mine");
-      return true;
-    }
-
-    function canAfford(cost) {
-      if (!cost) return true;
-      for (const k in cost) {
-        const need = Number(cost[k] ?? 0);
-        if (need <= 0) continue;
-        if (!isResourceUnlocked(k)) return false;
-        if ((state?.resources?.[k] ?? 0) < need) return false;
-      }
-      return true;
-    }
-
-    function fmtCostPretty(cost){
-      if (!cost) return "?";
-      const parts = [];
-      if (cost.food)  parts.push(`F:${cost.food}`);
-      if (cost.wood)  parts.push(`W:${cost.wood}`);
-      if (cost.stone) parts.push(`S:${cost.stone}`);
-      if (cost.ore)   parts.push(`O:${cost.ore}`);
-      if (cost.gold)  parts.push(`G:${cost.gold}`);
-      return parts.length ? parts.join("  ") : "?";
-    }
-
-    function syncLevelsFromPlaced() {
-      const lv = (state.buildings.levels ||= {});
-      // baseline keys
-      lv.townhall = 0;
-      lv.house = 0;
-      lv.farm = 0;
-      lv.lumber = 0;
-      lv.quarry = 0;
-      lv.mine = 0;
-      lv.barracks = 0;
-      lv.academy = 0;
-      lv.commandcenter = 0;
-
-      for (const plot of CITY_PLOTS) {
-        const placed = buildings.getPlacedOnPlot?.(plot.id);
-        if (!placed) continue;
-        const key = placed.buildingId;
-        if (Object.prototype.hasOwnProperty.call(lv, key)) lv[key] = placed.level ?? 1;
-      }
-      state.buildings.townhallLevel = lv.townhall || 0;
-    }
-
-    function getQueueInfoSafe() {
-      return buildings.getBuildQueueInfo?.() || { active: 0, max: 2, full: false };
-    }
-
-    // ===== UI State =====
-    let currentBuildPlot = null;
-    let barracksTab = "train";
-
-    function getStatusCompat(plotId){
-      return buildings.getStatus?.(plotId) || null;
-    }
-    function canBuildBuildingCompat(buildingId){
-      return buildings.canBuildBuilding?.(buildingId) ?? { ok:true };
-    }
-    function canUpgradePlotCompat(plotId){
-      return buildings.canUpgradePlot?.(plotId) ?? { ok:true };
-    }
-    async function placeBuildingCompat(plotId, buildingId){
-      return await buildings.placeBuildingOnPlot(plotId, buildingId, 1);
-    }
-    async function upgradePlotCompat(plotId){
-      return await buildings.upgradePlot(plotId);
-    }
-
-    function renderBuildPopupForPlot(plot, { recenter=true } = {}){
-      currentBuildPlot = plot;
       buildGrid.innerHTML = "";
 
-      const existing = buildings.getPlacedOnPlot?.(plot.id);
-      const st = getStatusCompat(plot.id);
-
-      if (existing) {
+      if (existing){
         const lvl = existing.level ?? 1;
-        const def = BUILDINGS[existing.buildingId];
+        const def = BUILDINGS?.[existing.buildingId];
         const name = def?.name || existing.buildingId;
 
         const constructing = !!st?.constructing;
-        const upgrading = !!st?.upgrading;
+        const upgrading    = !!st?.upgrading;
 
-        const chk = canUpgradePlotCompat(plot.id);
+        const chk = canUpgrade(plot.id);
         const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
-        const affordable = canAfford(upgradeCost);
+        const affordable  = canAfford(upgradeCost);
 
-        const q = getQueueInfoSafe();
+        const q = getQueueInfo();
         const queueBlocked = state.settings.timersEnabled && q.full;
 
-        const disabled =
-          constructing || upgrading ||
-          queueBlocked ||
-          (!chk.ok || !affordable || !upgradeCost);
-
-        const stateTag = constructing ? "Constructing" : upgrading ? "Upgrading" : "Occupied";
-        buildTitle.textContent = `Plot: ${plot.id} (${stateTag})`;
+        const disabled = constructing || upgrading || queueBlocked || (!chk.ok || !affordable || !upgradeCost);
 
         let timerLine = "";
-        if (constructing) {
-          timerLine = `<div class="upReason">Under construction… <b>${fmtDuration(st.buildRemainingMs)}</b> left</div>`;
-        } else if (upgrading) {
-          timerLine = `<div class="upReason">Upgrading to <b>Lv ${st.upgradingToLevel || (lvl+1)}</b>… <b>${fmtDuration(st.upgradeRemainingMs)}</b> left</div>`;
-        }
+        if (constructing) timerLine = `<div class="upReason">Under construction… <b>${fmtDuration(st.buildRemainingMs)}</b> left</div>`;
+        if (upgrading)    timerLine = `<div class="upReason">Upgrading… <b>${fmtDuration(st.upgradeRemainingMs)}</b> left</div>`;
+
+        buildTitle.textContent = `${name} (Lv ${lvl})`;
 
         buildGrid.innerHTML = `
           <div class="upCard">
-            <div class="upTitle">${name}</div>
-            <div class="upRow"><span>Current Level</span><b>${lvl}</b></div>
+            <div class="upRow"><span>Current</span><b>Lv ${lvl}</b></div>
             <div class="upRow"><span>Cost</span><span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
 
-            <button class="upBtn" type="button" data-action="build-upgrade" ${disabled ? "disabled" : ""}>
-              ${upgrading ? "Upgrading…" : `Upgrade → Lv ${lvl + 1}`}
+            <button class="upBtn" id="btnDoUpgrade" type="button" ${disabled ? "disabled":""}>
+              ${upgrading ? "Upgrading…" : `Upgrade → Lv ${lvl+1}`}
             </button>
 
             ${timerLine}
@@ -1000,443 +1675,111 @@ function centerPanelOnScreen(panelEl){
             ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable) ? `<div class="upReason">Not enough resources</div>` : ""}
           </div>
         `;
+
+        const btn = document.getElementById("btnDoUpgrade");
+        btn?.addEventListener("click", async ()=>{
+          const st2 = getStatus(plot.id);
+          if (st2?.constructing || st2?.upgrading) return;
+
+          const res = await upgradePlot(plot.id);
+          if (res?.ok === false) return alert(res.reason || "Upgrade failed");
+
+          openBuildPopupForPlot(plot);
+          saveGame(buildings);
+        });
+
       } else {
         buildTitle.textContent = `Plot: ${plot.id} (Build)`;
 
-        const q = getQueueInfoSafe();
+        const q = getQueueInfo();
         const queueBlocked = state.settings.timersEnabled && q.full;
 
-        const frag = document.createDocumentFragment();
-
-        for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")) {
+        for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")){
           const def = BUILDINGS[bKey];
           const cost = def?.cost || null;
 
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "buildBtn";
-          btn.setAttribute("data-action", "build-place");
-          btn.setAttribute("data-building-id", bKey);
+          btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCostPretty(cost)}` : ""}`;
 
-          const line2 = cost ? fmtCostPretty(cost) : "";
-          btn.textContent = (def?.name || bKey) + (line2 ? ("\n" + line2) : "");
-
-          const gate = canBuildBuildingCompat(bKey);
-          if (!gate.ok) {
+          const gate = canBuild(bKey);
+          if (!gate.ok){
             btn.disabled = true;
             btn.style.opacity = "0.35";
             btn.title = gate.reason;
-          } else if (cost && !canAfford(cost)) {
+          } else if (cost && !canAfford(cost)){
             btn.disabled = true;
             btn.style.opacity = "0.35";
             btn.title = "Not enough resources";
-          }
-
-          if (queueBlocked) {
+          } else if (queueBlocked){
             btn.disabled = true;
             btn.style.opacity = "0.35";
             btn.title = `All ${q.max} builder queues are busy.`;
           }
 
-          frag.appendChild(btn);
-        }
+          btn.addEventListener("click", async ()=>{
+            const r = await placeBuilding(plot.id, bKey);
+            if (r?.ok === false) return alert(r.reason || "Could not build.");
 
-        buildGrid.appendChild(frag);
+            hideAllPanels();
+            saveGame(buildings);
+          });
+
+          buildGrid.appendChild(btn);
+        }
       }
 
+      hideAllPanels();
       popup.style.display = "block";
-      if (recenter) centerPanel(popup);
+      centerPanel(popup);
     }
 
-    function fmtMMSS(ms) {
-      const total = Math.max(0, Math.ceil(ms / 1000));
-      const m = Math.floor(total / 60);
-      const s = total % 60;
-      return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
-    }
+    btnSettings.addEventListener("click", ()=>{
+      userInteracted = true;
+      hideAllPanels();
+      settingsPanel.style.display = "block";
+      syncSettingsUI();
+      centerPanel(settingsPanel);
+    });
 
-    function unlockedTiersForBarracksLevel(lvl) {
-      const tiers = [];
-      for (const tier of ["T1","T2","T3","T4"]) {
-        if ((BARRACKS_TIER_UNLOCK?.[tier] ?? 999) <= lvl) tiers.push(tier);
-      }
-      return tiers;
-    }
+    settingsClose.addEventListener("click", ()=>{
+      settingsPanel.style.display = "none";
+    });
 
-    function troopOptionsForBarracksLevel(barracksLevel) {
-      const allowed = new Set(unlockedTiersForBarracksLevel(barracksLevel));
-      return Object.values(TROOPS)
-        .filter(t => allowed.has(t.tier))
-        .map(t => ({ id: t.id, label: t.label ?? t.id }));
-    }
-
-    function getBarracksLevelSafe() {
-      return Number(state?.buildings?.levels?.barracks || 0);
-    }
-
-    function findBarracksPlot(){
-      return CITY_PLOTS.find(p => buildings.getPlacedOnPlot?.(p.id)?.buildingId === "barracks") || null;
-    }
-
-    function normalizeSlots(snap){
-      let slots = snap?.slots ?? snap?.items ?? snap?.queue ?? snap?.queues?.barracks ?? snap?.queues;
-      if (!Array.isArray(slots)) slots = slots ? Object.values(slots).flat() : [];
-      return slots.map((s) => {
-        if (s?.active) {
-          const job = s.active;
-          const now = Date.now();
-          const totalMs = job.totalMs ?? Math.max(1, (job.endAt ?? now) - (job.startAt ?? now));
-          const remainingMs = Math.max(0, (job.endAt ?? now) - now);
-          return { status:"training", troopId:job.troopId, amount:job.amount, totalMs, remainingMs };
-        }
-        if (s?.status) return s;
-        return { status:"idle" };
-      });
-    }
-
-    function renderBarracksPanel({ recenter=true } = {}){
-      const barracksLevel = getBarracksLevelSafe();
-      try { syncBarracksSlots?.(barracksLevel); } catch {}
-
-      const snap = getTrainingSnapshot?.("barracks") ?? {};
-      const normalized = normalizeSlots(snap);
-      const opts = troopOptionsForBarracksLevel(barracksLevel);
-
-      const trainHtml = normalized.map((s, i) => {
-        const isIdle = s.status === "idle" || !s.troopId;
-        if (isIdle) {
-          const options = opts.map(o => `<option value="${o.id}">${o.label}</option>`).join("");
-          return `
-            <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <b>Slot ${i+1}</b>
-                <span style="opacity:.7">Idle</span>
-              </div>
-
-              <div style="display:flex;gap:8px;margin-top:10px;">
-                <select data-slot="${i}" data-role="troop"
-                  style="flex:1; background:#111827; color:#e5e7eb; border:1px solid rgba(255,255,255,.12);
-                  border-radius:12px; padding:10px;">
-                  ${options || `<option value="">(No troops unlocked)</option>`}
-                </select>
-
-                <input data-slot="${i}" data-role="amt" type="number" min="1" value="1"
-                  style="width:92px; background:#111827; color:#e5e7eb; border:1px solid rgba(255,255,255,.12);
-                  border-radius:12px; padding:10px;" />
-              </div>
-
-              <button type="button" data-action="bx-start" data-slot="${i}"
-                style="margin-top:10px; width:100%; background:#2563eb; color:white; border:0;
-                border-radius:12px; padding:12px; font-weight:900; cursor:pointer; touch-action:manipulation;">
-                Train
-              </button>
-            </div>
-          `;
-        }
-
-        const pct = s.totalMs ? Math.min(100, Math.max(0, 100 * (1 - s.remainingMs / s.totalMs))) : 0;
-        return `
-          <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin:10px 0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <b>Slot ${i+1}</b>
-              <span style="opacity:.9">${s.troopId} × ${s.amount}</span>
-            </div>
-
-            <div style="margin-top:10px; height:10px; background:rgba(255,255,255,.12); border-radius:999px; overflow:hidden;">
-              <div style="height:100%; width:${pct}%; background:rgba(37,99,235,.95);"></div>
-            </div>
-
-            <div style="display:flex; justify-content:space-between; margin-top:8px; opacity:.85;">
-              <span>${fmtMMSS(s.remainingMs)} left</span>
-              <span>${Math.round(pct)}%</span>
-            </div>
-
-            <button type="button" data-action="bx-cancel" data-slot="${i}"
-              style="margin-top:10px; width:100%; background:rgba(239,68,68,.95); color:white; border:0;
-              border-radius:12px; padding:12px; font-weight:900; cursor:pointer; touch-action:manipulation;">
-              Cancel
-            </button>
-          </div>
-        `;
-      }).join("");
-
-      const barracksPlot = findBarracksPlot();
-      const barracksPlaced = barracksPlot ? buildings.getPlacedOnPlot?.(barracksPlot.id) : null;
-
-      let upgradeBlock = `<div style="opacity:.85">No barracks placed yet.</div>`;
-      if (barracksPlaced && barracksPlot) {
-        const lvl = barracksPlaced.level ?? 1;
-        const chk = canUpgradePlotCompat(barracksPlot.id);
-        const def = BUILDINGS?.barracks;
-        const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
-        const affordable = canAfford(upgradeCost);
-
-        const st = getStatusCompat(barracksPlot.id);
-        const upgrading = !!st?.upgrading;
-        const constructing = !!st?.constructing;
-
-        const q = getQueueInfoSafe();
-        const queueBlocked = state.settings.timersEnabled && q.full;
-
-        const disabled = constructing || upgrading || queueBlocked || (!chk.ok || (upgradeCost && !affordable) || !upgradeCost);
-
-        let timerLine = "";
-        if (constructing) timerLine = `<div class="upReason">Under construction… <b>${fmtDuration(st.buildRemainingMs)}</b> left</div>`;
-        if (upgrading) timerLine = `<div class="upReason">Upgrading… <b>${fmtDuration(st.upgradeRemainingMs)}</b> left</div>`;
-
-        upgradeBlock = `
-          <div class="upCard">
-            <div class="upTitle">Barracks</div>
-            <div class="upRow"><span>Current Level:</span> <b>${lvl}</b></div>
-            <div class="upRow"><span>Cost:</span> <span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
-
-            <button type="button" class="upBtn" data-action="bx-upgrade" ${disabled ? "disabled" : ""}>
-              ${upgrading ? "Upgrading…" : `Upgrade → Lv ${lvl+1}`}
-            </button>
-
-            ${timerLine}
-            ${(!constructing && !upgrading && queueBlocked) ? `<div class="upReason">All ${q.max} builder queues are busy.</div>` : ""}
-            ${(!constructing && !upgrading && !chk.ok ? `<div class="upReason">${chk.reason}</div>` : "")}
-            ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable ? `<div class="upReason">Not enough resources</div>` : "")}
-
-            <div class="upHint">Tiers unlock: L1=T1, L5=T2, L10=T3, L15=T4</div>
-          </div>
-        `;
-      }
-
-      barracksPanel.innerHTML = `
-        <div class="bxHeader">
-          <div>
-            <div style="font-size:14px;font-weight:900;">Barracks</div>
-            <div style="opacity:.7;margin-top:2px;">L${barracksLevel}</div>
-          </div>
-          <button class="bxClose" type="button" data-action="bx-close">Close</button>
-        </div>
-
-        <div class="bxWrap">
-          <div class="bxTabs">
-            <button class="bxTab ${barracksTab==="train"?"active":""}" data-action="bx-tab" data-tab="train" type="button">Train</button>
-            <button class="bxTab ${barracksTab==="upgrade"?"active":""}" data-action="bx-tab" data-tab="upgrade" type="button">Upgrade</button>
-          </div>
-
-          <div class="bxMain">
-            <div style="display:${barracksTab==="train"?"block":"none"};">
-              ${trainHtml || `<div style="opacity:.8">No slots found.</div>`}
-              <div class="upHint">Tiers unlock: L1=T1, L5=T2, L10=T3, L15=T4</div>
-            </div>
-
-            <div style="display:${barracksTab==="upgrade"?"block":"none"};">
-              ${upgradeBlock}
-            </div>
-          </div>
-        </div>
-      `;
-
-      if (recenter) centerPanel(barracksPanel);
-    }
-
-    async function handleAction(action, el){
-      if (action === "open-settings") {
-        popup.style.display = "none";
-        barracksPanel.style.display = "none";
-        settingsPanel.style.display = "block";
-        syncSettingsUI();
-        centerPanel(settingsPanel);
-        return;
-      }
-      if (action === "settings-close") { settingsPanel.style.display = "none"; return; }
-      if (action === "timers-finish-now") {
-        buildings.finishAllTimersNow?.();
-        if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
-        if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
-        try { saveGame(); } catch {}
-        return;
-      }
-      if (action === "build-close") { popup.style.display = "none"; return; }
-
-      if (action === "build-upgrade") {
-        const plot = currentBuildPlot;
-        if (!plot) return;
-
-        const st = getStatusCompat(plot.id);
-        if (st?.constructing || st?.upgrading) return;
-
-        const res = await upgradePlotCompat(plot.id);
-        if (!res?.ok) { alert(res?.reason || "Upgrade failed"); return; }
-
-        syncLevelsFromPlaced();
-        renderBuildPopupForPlot(plot, { recenter:false });
-        try { saveGame(); } catch {}
-        return;
-      }
-
-      if (action === "build-place") {
-        const plot = currentBuildPlot;
-        if (!plot) return;
-
-        const bKey = el.getAttribute("data-building-id");
-        if (!bKey) return;
-
-        const r = await placeBuildingCompat(plot.id, bKey);
-        if (r && r.ok === false) alert(r.reason || "Could not build.");
-
-        syncLevelsFromPlaced();
-        popup.style.display = "none";
-        try { saveGame(); } catch {}
-        return;
-      }
-
-      if (action === "bx-close") { barracksPanel.style.display = "none"; return; }
-      if (action === "bx-tab") {
-        barracksTab = el.getAttribute("data-tab") || "train";
-        renderBarracksPanel({ recenter:true });
-        return;
-      }
-
-      if (action === "bx-start") {
-        const barracksLevel = getBarracksLevelSafe();
-        const slotIndex = Number(el.getAttribute("data-slot"));
-        const troopSel = barracksPanel.querySelector(`select[data-slot="${slotIndex}"][data-role="troop"]`);
-        const amtInp  = barracksPanel.querySelector(`input[data-slot="${slotIndex}"][data-role="amt"]`);
-        const troopId = troopSel?.value;
-        const amount = Math.max(1, Number(amtInp?.value || 1));
-        if (!troopId) return alert("No troop selected / unlocked.");
-        const res = startTrainingInSlot({ barracksLevel, slotIndex, troopId, amount });
-        if (!res?.ok) alert(res?.reason || "Could not start training.");
-        renderBarracksPanel({ recenter:false });
-        return;
-      }
-
-      if (action === "bx-cancel") {
-        const slotIndex = Number(el.getAttribute("data-slot"));
-        if (!confirm("Cancel this training slot?")) return;
-        const res = cancelTraining?.({ slotIndex, refundPercent: 0.5 });
-        if (res && res.ok === false) alert(res.reason || "Could not cancel.");
-        renderBarracksPanel({ recenter:false });
-        return;
-      }
-
-      if (action === "bx-upgrade") {
-        const barracksPlot = findBarracksPlot();
-        if (!barracksPlot) return;
-
-        const st = getStatusCompat(barracksPlot.id);
-        if (st?.constructing || st?.upgrading) return;
-
-        const r = await upgradePlotCompat(barracksPlot.id);
-        if (r && r.ok === false) { alert(r.reason || "Upgrade failed."); return; }
-
-        syncLevelsFromPlaced();
-        renderBarracksPanel({ recenter:false });
-        try { saveGame(); } catch {}
-        return;
-      }
-    }
-
-    // Delegated clicks for panel buttons
-    document.getElementById("panels").addEventListener("pointerup", async (e) => {
-      const btn = e.target?.closest?.("[data-action]");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const action = btn.getAttribute("data-action");
-      await handleAction(action, btn);
-    }, { passive:false });
-
-    // Settings toggle
-    syncSettingsUI();
-    timersToggle.addEventListener("change", () => {
+    timersToggle.addEventListener("change", ()=>{
       state.settings.timersEnabled = !!timersToggle.checked;
       syncSettingsUI();
 
-      if (!state.settings.timersEnabled) {
+      if (!state.settings.timersEnabled){
         buildings.finishAllTimersNow?.();
-        if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
-        if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
       }
-      try { saveGame(); } catch {}
+      saveGame(buildings);
     });
 
-    // Top HUD buttons
-    btnSettings.addEventListener("pointerup", () => handleAction("open-settings"));
-    btnSave.addEventListener("pointerup", () => saveGame());
-    btnLoad.addEventListener("pointerup", () => loadGame());
-    btnReset.addEventListener("pointerup", () => resetSave());
-
-    // Plot click
-    scene.setOnPlotClick((plot) => {
-      if (!plot) return;
-      if (settingsPanel.style.display !== "none") return;
-
-      const existing = buildings.getPlacedOnPlot?.(plot.id);
-      const isBarracks = existing?.buildingId === "barracks";
-
-      if (isBarracks) {
-        popup.style.display = "none";
-        settingsPanel.style.display = "none";
-        barracksTab = "train";
-        barracksPanel.style.display = "block";
-        renderBarracksPanel({ recenter:true });
-        return;
-      }
-
-      barracksPanel.style.display = "none";
-      settingsPanel.style.display = "none";
-      renderBuildPopupForPlot(plot, { recenter:true });
+    finishTimersNow.addEventListener("click", ()=>{
+      buildings.finishAllTimersNow?.();
+      saveGame(buildings);
     });
 
-    // ===== Save / Load =====
-    function buildSavePayload() {
-      syncLevelsFromPlaced();
-      const placed = [];
+    btnSave.addEventListener("click", ()=> saveGame(buildings));
+    btnLoad.addEventListener("click", ()=> loadGame());
+    btnReset.addEventListener("click", ()=>{
+      if (!confirm("Reset save and reload?")) return;
+      resetSave();
+    });
 
-      for (const plot of CITY_PLOTS) {
-        const p = buildings.getPlacedOnPlot?.(plot.id);
-        if (!p) continue;
-        placed.push({
-          plotId: plot.id,
-          buildingId: p.buildingId,
-          level: p.level ?? 1,
-          buildStartedAt: p.buildStartedAt ?? 0,
-          buildEndAt: p.buildEndAt ?? 0,
-          upgradeStartedAt: p.upgradeStartedAt ?? 0,
-          upgradeEndAt: p.upgradeEndAt ?? 0,
-          upgradingToLevel: p.upgradingToLevel ?? 0,
-        });
-      }
+    buildClose.addEventListener("click", ()=> popup.style.display = "none");
 
-      return {
-        v: 1,
-        ts: Date.now(),
-        resources: { ...state.resources },
-        levels: { ...state.buildings.levels },
-        settings: { ...state.settings },
-        placed,
-      };
-    }
+    btnCity.addEventListener("click", ()=> console.log("City (already here)"));
+    btnWorld.addEventListener("click", ()=> alert("World view coming next 👀"));
 
-    function saveGame() {
-      const payload = buildSavePayload();
-      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-    }
-
-    function loadGame() {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return console.warn("No save found.");
-      sessionStorage.setItem(PENDING_KEY, raw);
-      location.reload();
-    }
-
-    function resetSave() {
-      localStorage.removeItem(SAVE_KEY);
-      sessionStorage.removeItem(PENDING_KEY);
-      location.reload();
-    }
-
-    async function applyPayload(data) {
+    async function applyPayload(data){
       if (!data || typeof data !== "object") return false;
 
-      if (data.resources) {
+      ensureResKeys();
+
+      if (data.resources){
         state.resources.food  = Number(data.resources.food  ?? 0);
         state.resources.wood  = Number(data.resources.wood  ?? 0);
         state.resources.stone = Number(data.resources.stone ?? 0);
@@ -1444,105 +1787,84 @@ function centerPanelOnScreen(panelEl){
         state.resources.gold  = Number(data.resources.gold  ?? 0);
       }
 
-      if (data.settings && typeof data.settings === "object") {
-        state.settings.timersEnabled = (typeof data.settings.timersEnabled === "boolean")
-          ? data.settings.timersEnabled
-          : state.settings.timersEnabled;
-        syncSettingsUI();
+      if (data.settings && typeof data.settings === "object"){
+        if (typeof data.settings.timersEnabled === "boolean"){
+          state.settings.timersEnabled = data.settings.timersEnabled;
+        }
       }
 
-      if (Array.isArray(data.placed)) {
+      if (Array.isArray(data.placed)){
         await buildings.hydrateFromSave?.(data.placed);
       } else {
         buildings.resetAllPlaced?.();
       }
 
-      await buildings.ensureTownhall?.();
-      syncLevelsFromPlaced();
+      await ensureTownhallHard();
+      syncSettingsUI();
+      refreshHud();
       return true;
     }
 
-    (async function bootLoad() {
+    (async function bootLoad(){
+      hideAllPanels();
+      syncSettingsUI();
+      refreshHud();
+
       const pending = sessionStorage.getItem(PENDING_KEY);
-      if (!pending) {
-        await buildings.ensureTownhall?.();
-        syncLevelsFromPlaced();
+      if (!pending){
+        await ensureTownhallHard();
+        refreshHud();
         return;
       }
 
       sessionStorage.removeItem(PENDING_KEY);
-      try {
+      try{
         const data = JSON.parse(pending);
         await applyPayload(data);
-      } catch (e) {
+      }catch(e){
         console.error("Pending load failed:", e);
-        await buildings.ensureTownhall?.();
-        syncLevelsFromPlaced();
+        await ensureTownhallHard();
+      } finally {
+        refreshHud();
       }
     })();
 
-    // Autosave
-    setInterval(() => { try { saveGame(); } catch {} }, 10000);
+    scene.setOnPlotClick((plot)=>{
+      userInteracted = true;
+      if (isOpen(settingsPanel)) return;
+      openBuildPopupForPlot(plot);
+    });
 
-    // ===== Fixed HUD refresh =====
-    function refreshHud(){
-      const p = getProductionPerSecond();
-      // show totals; if you want rates later we can add a long-press tooltip or a details panel
-      r_food.textContent  = `🍖 ${fmt(state.resources.food)}`;
-      r_wood.textContent  = `🪵 ${fmt(state.resources.wood)}`;
-      r_stone.textContent = `🪨 ${fmt(state.resources.stone)}`;
-      r_ore.textContent   = `⛏️ ${fmt(state.resources.ore)}`;
-      r_gold.textContent  = `🪙 ${fmt(state.resources.gold)}`;
-      r_th.textContent    = `🏛️ TH ${state.buildings?.levels?.townhall || 0}`;
+    let lastFrameT = performance.now();
+    let hudAcc = 0;
 
-      const q = getQueueInfoSafe();
-      queueText.textContent = `Queue: ${q.active || 0}/${q.max || 2}`;
-      timerText.textContent = "Timers: " + (state.settings.timersEnabled ? "ON" : "OFF");
-
-      // optional: could show rates somewhere later (p.food etc)
-      void p;
-    }
-
-    // ===== Main loop =====
-    let lastT = 0;
     function frame(t){
-      const dt = lastT ? (t - lastT) / 1000 : 0;
-      lastT = t;
+      const dt = Math.max(0, (t - lastFrameT) / 1000);
+      lastFrameT = t;
 
       scene.update();
       scene.render();
 
-      // economy tick
+      processTrainingQueues?.();
       updateEconomy(dt);
 
-      // training tick
-      try { processTrainingQueues?.(); } catch {}
+      hudAcc += dt;
+      if (hudAcc >= 0.2){
+        hudAcc = 0;
+        refreshHud();
+      }
 
-      // build/upgrade timers tick
-      try {
-        const changed = buildings.tick?.() || false;
-        if (changed) {
-          syncLevelsFromPlaced();
-          try { saveGame(); } catch {}
-        }
-      } catch {}
-
-      // update open panels (timer countdowns)
-      if (popup.style.display !== "none" && currentBuildPlot) renderBuildPopupForPlot(currentBuildPlot, { recenter:false });
-      if (barracksPanel.style.display !== "none") renderBarracksPanel({ recenter:false });
-
-      refreshHud();
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
 
-    // keep centered panels centered on resize
-    window.addEventListener("resize", () => {
-      if (popup.style.display !== "none") centerPanel(popup);
-      if (barracksPanel.style.display !== "none") centerPanel(barracksPanel);
-      if (settingsPanel.style.display !== "none") centerPanel(settingsPanel);
+    window.addEventListener("resize", ()=>{
+      if (isOpen(popup)) centerPanel(popup);
+      if (isOpen(settingsPanel)) centerPanel(settingsPanel);
+      if (isOpen(barracksPanel)) centerPanel(barracksPanel);
     });
+
+    setInterval(()=>{ try{ saveGame(buildings); }catch{} }, 10000);
   </script>
 </body>
 </html>
-  
