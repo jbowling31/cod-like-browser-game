@@ -1,4 +1,5 @@
 // docs/js/data/buildingCatalog.js
+import { upgradeCostFor } from "./costCurves.js";
 
 export const LEVEL_KEYS = ["L1", "L5", "L10", "L15", "L20"];
 
@@ -17,12 +18,7 @@ export const BUILDINGS = {
     name: "Town Hall",
     fileBase: "townhall",
     cost: { wood: 0, gold: 0 },
-    // No stone required until upgrading TH5 -> TH6 (upgradeCost(5))
-    upgradeCost: (level) => ({
-      wood: 100 * level,
-      gold: 60 * level,
-      stone: level >= 5 ? 80 * level : 0,
-    }),
+    upgradeCost: (level) => upgradeCostFor("townhall", level),
     // Optional art sizing defaults (can be overridden in cityBuildings.js too)
     w: 64,
     h: 64,
@@ -35,10 +31,7 @@ export const BUILDINGS = {
     fileBase: "farm",
     minTownhallLevel: 1,
     cost: { wood: 60, gold: 10 },
-    upgradeCost: (level) => ({
-      wood: 40 * level,
-      gold: 10 * level,
-    }),
+    upgradeCost: (level) => upgradeCostFor("farm", level),
   },
 
   // Unlocks at TH3
@@ -48,10 +41,7 @@ export const BUILDINGS = {
     fileBase: "lumber",
     minTownhallLevel: 1,
     cost: { wood: 40, gold: 10 },
-    upgradeCost: (level) => ({
-      wood: 30 * level,
-      gold: 10 * level,
-    }),
+    upgradeCost: (level) => upgradeCostFor("lumber", level),
   },
 
   // Unlocks at TH4
@@ -62,10 +52,7 @@ export const BUILDINGS = {
     unique: true,
     minTownhallLevel: 2,
     cost: { wood: 120, gold: 60 },
-    upgradeCost: (level) => ({
-      wood: 60 * level,
-      gold: 30 * level,
-    }),
+    upgradeCost: (level) => upgradeCostFor("barracks", level),
   },
 
   // Unlocks at TH5
@@ -75,11 +62,7 @@ export const BUILDINGS = {
     fileBase: "quarry",
     minTownhallLevel: 5,
     cost: { wood: 80, gold: 25 },
-    upgradeCost: (level) => ({
-      wood: 30 * level,
-      stone: 20 * level,
-      gold: 10 * level,
-    }),
+    upgradeCost: (level) => upgradeCostFor("quarry", level),
   },
 
   // Unlocks at TH6
@@ -89,11 +72,7 @@ export const BUILDINGS = {
     fileBase: "house",
     minTownhallLevel: 1,
     cost: { wood: 80, gold: 20 },
-    upgradeCost: (level) => ({
-      wood: 50 * level,
-      stone: 20 * level,
-      gold: 20 * level,
-    }),
+    upgradeCost: (level) => upgradeCostFor("house", level),
   },
 
   // Unlocks at TH7
@@ -103,11 +82,7 @@ export const BUILDINGS = {
     fileBase: "mine",
     minTownhallLevel: 6,
     cost: { wood: 120, gold: 40 },
-    upgradeCost: (level) => ({
-      wood: 40 * level,
-      stone: 30 * level,
-      gold: 20 * level,
-    }),
+    upgradeCost: (level) => upgradeCostFor("mine", level),
   },
 
   // Unlocks at TH8
@@ -118,11 +93,7 @@ export const BUILDINGS = {
     unique: true,
     minTownhallLevel: 8,
     cost: { wood: 120, stone: 80, gold: 80 },
-    upgradeCost: (level) => ({
-      wood: 70 * level,
-      stone: 60 * level,
-      gold: 40 * level,
-    }),
+    upgradeCost: (level) => upgradeCostFor("academy", level),
   },
 
   // Unlocks at TH10
@@ -133,10 +104,6 @@ export const BUILDINGS = {
     unique: true,
     minTownhallLevel: 5,
     cost: { wood: 150, stone: 120, gold: 120 },
-    upgradeCost: (level) => ({
-      wood: 90 * level,
-      stone: 80 * level,
-      gold: 60 * level,
-    }),
+    upgradeCost: (level) => upgradeCostFor("commandcenter", level),
   },
 };

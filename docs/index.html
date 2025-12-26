@@ -107,14 +107,22 @@
 
     .resourcePill .r{
       display:inline-flex;
-      align-items:baseline;
-      gap:6px;
+      flex-direction:column;
+      align-items:flex-start;
+      gap:3px;
       padding:6px 10px;
       border-radius:12px;
       background: var(--hud-pill);
       border:1px solid var(--hud-pill-border);
       font: 13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
       white-space:nowrap;
+      min-width: 74px;
+    }
+
+    .resourcePill .r .rate{
+      font: 11px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      opacity: .85;
+      letter-spacing: .2px;
     }
 
     .rightPill{
@@ -158,6 +166,7 @@
       padding:8px 12px;
       font: 12px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial;
       opacity:.92;
+      flex-wrap:wrap;
     }
 
     .hudBottom{
@@ -324,6 +333,24 @@
       border:1px solid rgba(255,255,255,.10);
       background: rgba(0,0,0,.35);
     }
+
+    .speedRow{
+      margin-top:10px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .speedSelect{
+      width:100%;
+      border-radius:12px;
+      padding:10px 10px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.10);
+      color:#fff;
+      font-weight:900;
+      outline:none;
+    }
   </style>
 
   <link rel="icon" href="./favicon.ico">
@@ -336,11 +363,11 @@
   <div id="hudFixed">
     <div class="hudTop">
       <div class="pill resourcePill">
-        <span class="r" id="r_food">🍖 0</span>
-        <span class="r" id="r_wood">🪵 0</span>
-        <span class="r" id="r_stone">🪨 0</span>
-        <span class="r" id="r_ore">⛏️ 0</span>
-        <span class="r" id="r_gold">🪙 0</span>
+        <span class="r" id="r_food"><span class="val">🍖 0</span><span class="rate" id="rps_food">+0/s</span></span>
+        <span class="r" id="r_wood"><span class="val">🪵 0</span><span class="rate" id="rps_wood">+0/s</span></span>
+        <span class="r" id="r_stone"><span class="val">🪨 0</span><span class="rate" id="rps_stone">+0/s</span></span>
+        <span class="r" id="r_ore"><span class="val">⛏️ 0</span><span class="rate" id="rps_ore">+0/s</span></span>
+        <span class="r" id="r_gold"><span class="val">🪙 0</span><span class="rate" id="rps_gold">+0/s</span></span>
       </div>
 
       <div class="pill rightPill">
@@ -354,6 +381,7 @@
       <div class="pill queuePill">
         <span id="queueText">Queue: 0/2</span>
         <span id="timerText">Timers: ON</span>
+        <span id="buildLine">Building (Available builder)</span>
       </div>
     </div>
 
@@ -441,34 +469,17 @@
 
     if (!createBuildingsSystem) throw new Error("No createCityBuildingsSystem export found in cityBuildings.js");
 
+    // Training system optional: you said it's ALWAYS trainingsystems.
     let trainingMod = null;
     try{
       trainingMod = await importFirst([
         "./js/systems/trainingSystems.js",
         "./js/systems/trainingsystems.js",
-        "./js/systems/trainingSystems.js",
-        "./js/systems/trainingsystems.js"
       ]);
     }catch(e){
       trainingMod = {};
     }
-
     const processTrainingQueues = trainingMod.processTrainingQueues || (()=>{});
-    const getTrainingSnapshot   = trainingMod.getTrainingSnapshot   || (()=>({}));
-    const startTrainingInSlot   = trainingMod.startTrainingInSlot   || (()=>({ ok:false, reason:"Training system missing" }));
-    const cancelTraining        = trainingMod.cancelTraining        || (()=>({ ok:false, reason:"Training system missing" }));
-    const syncBarracksSlots     = trainingMod.syncBarracksSlots     || (()=>{});
-
-    let troopsMod = null;
-    try{
-      troopsMod = await importFirst([
-        "./js/data/troopsCatalog.js"
-      ]);
-    }catch(e){
-      troopsMod = { TROOPS:{}, BARRACKS_TIER_UNLOCK:{} };
-    }
-    const TROOPS = troopsMod.TROOPS || {};
-    const BARRACKS_TIER_UNLOCK = troopsMod.BARRACKS_TIER_UNLOCK || {};
 
     function ensureResKeys(){
       state.resources ??= {};
@@ -487,13 +498,22 @@
 
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
+    // ---- HUD refs
     const elFood  = document.getElementById("r_food");
     const elWood  = document.getElementById("r_wood");
     const elStone = document.getElementById("r_stone");
     const elOre   = document.getElementById("r_ore");
     const elGold  = document.getElementById("r_gold");
+
+    const elRpsFood  = document.getElementById("rps_food");
+    const elRpsWood  = document.getElementById("rps_wood");
+    const elRpsStone = document.getElementById("rps_stone");
+    const elRpsOre   = document.getElementById("rps_ore");
+    const elRpsGold  = document.getElementById("rps_gold");
+
     const elQueue = document.getElementById("queueText");
     const elTimers= document.getElementById("timerText");
+    const elBuildLine = document.getElementById("buildLine");
 
     const btnSave     = document.getElementById("btnSave");
     const btnSettings = document.getElementById("btnSettings");
@@ -503,6 +523,7 @@
     const btnCity  = document.getElementById("btnCity");
     const btnWorld = document.getElementById("btnWorld");
 
+    // panels
     const popup        = document.getElementById("buildPopup");
     const buildTitle   = document.getElementById("buildTitle");
     const buildGrid    = document.getElementById("buildGrid");
@@ -517,6 +538,7 @@
     const finishTimersNow = document.getElementById("finishTimersNow");
 
     function hideAllPanels(){
+      stopPopupLiveTimer();
       popup.style.display = "none";
       barracksPanel.style.display = "none";
       settingsPanel.style.display = "none";
@@ -564,6 +586,7 @@
       elTimers.textContent = `Timers: ${state.settings.timersEnabled ? "ON" : "OFF"}`;
     }
 
+    // ---- save/load/reset
     function buildSavePayload(buildings){
       const placed = [];
       for (const plot of CITY_PLOTS){
@@ -610,6 +633,7 @@
       location.reload();
     }
 
+    // ---- helpers
     function pointInRect(px, py, r){
       return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
     }
@@ -627,6 +651,28 @@
 
     function fmt(n){ return Math.floor(n||0).toLocaleString(); }
 
+    function fmtRate(n){
+      const v = Number(n ?? 0);
+      if (!Number.isFinite(v) || v === 0) return "+0/s";
+      const abs = Math.abs(v);
+      const shown = abs < 10 ? (Math.round(v * 10) / 10) : Math.round(v);
+      const sign = shown >= 0 ? "+" : "";
+      return `${sign}${shown}/s`;
+    }
+
+    function fmtDuration(ms){
+      const totalSec = Math.max(0, Math.ceil(ms / 1000));
+      const d = Math.floor(totalSec / 86400);
+      const h = Math.floor((totalSec % 86400) / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (d>0) return `${d}d ${h}h ${m}m`;
+      if (h>0) return `${h}h ${m}m`;
+      if (m>0) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+
+    // ---- Scene (canvas map + camera + picking)
     function createCityScene(canvas, { baseMapSrc, initialMapSize }) {
       const ctx = canvas.getContext("2d", { alpha:false, desynchronized:true });
       ctx.imageSmoothingEnabled = false;
@@ -905,8 +951,10 @@
       };
     }
 
+    // ---- buildings system
     const buildings = createBuildingsSystem({ basePath: BUILDING_BASE_PATH });
 
+    // ---- helpers against buildings API differences
     function getPlaced(plotId){ return buildings.getPlacedOnPlot?.(plotId) || null; }
     function getStatus(plotId){ return buildings.getStatus?.(plotId) || null; }
     function canBuild(buildingId){ return buildings.canBuildBuilding?.(buildingId) ?? { ok:true }; }
@@ -937,6 +985,7 @@
       }
     }
 
+    // ---- map scene
     const canvas = document.getElementById("cityCanvas");
     const inferred = inferMapSizeFromPlots(CITY_PLOTS, 512, 512);
     const scene = createCityScene(canvas, { baseMapSrc: BASE_MAP_SRC, initialMapSize: inferred });
@@ -1005,110 +1054,92 @@
         `${base}/${buildingId}_L1.png`,
       ];
     }
-// ---------- Clouds (cheap, no images) ----------
-// ---------- Clouds (cheap, no images) ----------
-function makeCloudTile(size = 256, ink = "light"){
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const g = c.getContext("2d");
 
-  g.clearRect(0, 0, size, size);
+    // ---------- Clouds (cheap, no images) ----------
+    function makeCloudTile(size = 256, ink = "light"){
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      const g = c.getContext("2d");
+      g.clearRect(0, 0, size, size);
 
-  const blobCount = 46;
-  for (let i = 0; i < blobCount; i++){
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const r = 26 + Math.random() * 78;
+      const blobCount = 46;
+      for (let i = 0; i < blobCount; i++){
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const r = 26 + Math.random() * 78;
 
-    const a0 = ink === "dark" ? (0.10 + Math.random() * 0.14) : (0.18 + Math.random() * 0.22);
-    const grd = g.createRadialGradient(x, y, 0, x, y, r);
-    grd.addColorStop(0, ink === "dark" ? `rgba(0,0,0,${a0})` : `rgba(255,255,255,${a0})`);
-    grd.addColorStop(1, "rgba(0,0,0,0)");
-    g.fillStyle = grd;
-    g.beginPath();
-    g.arc(x, y, r, 0, Math.PI * 2);
-    g.fill();
-  }
+        const a0 = ink === "dark" ? (0.10 + Math.random() * 0.14) : (0.18 + Math.random() * 0.22);
+        const grd = g.createRadialGradient(x, y, 0, x, y, r);
+        grd.addColorStop(0, ink === "dark" ? `rgba(0,0,0,${a0})` : `rgba(255,255,255,${a0})`);
+        grd.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = grd;
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.fill();
+      }
 
-  return c;
-}
-
-// two tiles: one for visible clouds, one for shadow mask
-const cloudTileLight = makeCloudTile(256, "light");
-const cloudTileDark  = makeCloudTile(256, "dark");
-
-
-const cloudTile = makeCloudTile(256);
-
-function drawTiled(ctx, tile, w, h, ox, oy){
-  const tw = tile.width, th = tile.height;
-  const startX = -tw + ((-ox % tw) + tw) % tw;
-  const startY = -th + ((-oy % th) + th) % th;
-
-  for (let y = startY; y < h + th; y += th){
-    for (let x = startX; x < w + tw; x += tw){
-      ctx.drawImage(tile, x, y);
+      return c;
     }
-  }
-}
 
-/**
- * World-space shadows: call while ctx is in WORLD transform (after base map draw).
- */
-function drawCloudShadowsWorld(ctx, mapW, mapH, t, strength = 1){
-  if (strength <= 0.001) return;
+    const cloudTileLight = makeCloudTile(256, "light");
+    const cloudTileDark  = makeCloudTile(256, "dark");
 
-  const speedX = 0.010; // world units/ms (tuned to feel slow)
-  const speedY = 0.004;
+    function drawTiled(ctx, tile, w, h, ox, oy){
+      const tw = tile.width, th = tile.height;
+      const startX = -tw + ((-ox % tw) + tw) % tw;
+      const startY = -th + ((-oy % th) + th) % th;
 
-  const ox = t * speedX;
-  const oy = t * speedY;
+      for (let y = startY; y < h + th; y += th){
+        for (let x = startX; x < w + tw; x += tw){
+          ctx.drawImage(tile, x, y);
+        }
+      }
+    }
 
-  ctx.save();
-  ctx.globalCompositeOperation = "multiply";
-  ctx.globalAlpha = 0.13 * strength;
+    function drawCloudShadowsWorld(ctx, mapW, mapH, t, strength = 1){
+      if (strength <= 0.001) return;
 
-  // Slight cool tint in shadow (not pure black)
-  ctx.fillStyle = "rgba(160,190,255,1)";
-  // Use tile alpha as mask by drawing the tile itself
-  drawTiled(ctx, cloudTileDark, mapW, mapH, ox, oy);
+      const speedX = 0.010;
+      const speedY = 0.004;
+      const ox = t * speedX;
+      const oy = t * speedY;
 
-  // Second layer for depth (different speed/scale)
-  ctx.globalAlpha = 0.07 * strength;
- drawTiled(ctx, cloudTileDark, mapW, mapH, ox * 1.7 + 120, oy * 1.3 + 60);
+      ctx.save();
+      ctx.globalCompositeOperation = "multiply";
 
-  ctx.restore();
-}
+      ctx.globalAlpha = 0.18 * strength;
+      drawTiled(ctx, cloudTileDark, mapW, mapH, ox, oy);
 
-/**
- * Screen-space clouds: call in SCREEN overlay (identity transform).
- */
-function drawCloudsScreen(ctx, t, strength = 1){
-  if (strength <= 0.001) return;
+      ctx.globalAlpha = 0.10 * strength;
+      drawTiled(ctx, cloudTileDark, mapW, mapH, ox * 1.7 + 120, oy * 1.3 + 60);
 
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
+      ctx.restore();
+    }
 
-  const speedX = 0.022; // px/ms
-  const speedY = 0.010;
+    function drawCloudsScreen(ctx, t, strength = 1){
+      if (strength <= 0.001) return;
 
-  const ox = t * speedX;
-  const oy = t * speedY;
+      const w = ctx.canvas.width;
+      const h = ctx.canvas.height;
 
-  ctx.save();
+      const speedX = 0.022;
+      const speedY = 0.010;
 
-  // Soft bright clouds
-  ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = 0.10 * strength;
-  drawTiled(ctx, cloudTileLight, w, h, ox, oy);
+      const ox = t * speedX;
+      const oy = t * speedY;
 
-  // Add a softer contrast pass
-  ctx.globalCompositeOperation = "soft-light";
-  ctx.globalAlpha = 0.10 * strength;
-  drawTiled(ctx, cloudTileLight, w, h, ox * 0.65 + 90, oy * 0.55 + 40);
+      ctx.save();
 
-  ctx.restore();
-}
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.12 * strength;
+      drawTiled(ctx, cloudTileLight, w, h, ox, oy);
+
+      ctx.globalCompositeOperation = "soft-light";
+      ctx.globalAlpha = 0.11 * strength;
+      drawTiled(ctx, cloudTileLight, w, h, ox * 0.65 + 90, oy * 0.55 + 40);
+
+      ctx.restore();
+    }
 
     // ---------- Wind shimmer ----------
     function makeNoiseTile(size = 192){
@@ -1119,10 +1150,10 @@ function drawCloudsScreen(ctx, t, strength = 1){
       const img = n.createImageData(size, size);
       for (let i = 0; i < img.data.length; i += 4){
         const v = (Math.random() * 255) | 0;
-        img.data[i]   = (v * 0.55) | 0;        // R
-        img.data[i+1] = Math.min(255, v + 35); // G
-        img.data[i+2] = (v * 0.55) | 0;        // B
-        img.data[i+3] = (Math.random() * 120) | 0; // A
+        img.data[i]   = (v * 0.55) | 0;
+        img.data[i+1] = Math.min(255, v + 35);
+        img.data[i+2] = (v * 0.55) | 0;
+        img.data[i+3] = (Math.random() * 120) | 0;
       }
       n.putImageData(img, 0, 0);
       return c;
@@ -1173,116 +1204,477 @@ function drawCloudsScreen(ctx, t, strength = 1){
         ctx.ellipse(gx, gy, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
       }
-      
+
       ctx.restore();
     }
-   
 
-// ---------- Night Fireflies (cheap particles) ----------
-let fireflies = [];
-let firefliesViewportKey = "";
+    // ---------- Night Fireflies (cheap particles) ----------
+    let fireflies = [];
+    let firefliesViewportKey = "";
 
-function rand01(seed){
-  // deterministic-ish pseudo random 0..1 from seed
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
+    function rand01(seed){
+      const x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+    }
 
-function ensureFireflies(w, h){
-  const key = `${w}x${h}`;
-  if (key === firefliesViewportKey && fireflies.length) return;
+    function ensureFireflies(w, h){
+      const key = `${w}x${h}`;
+      if (key === firefliesViewportKey && fireflies.length) return;
 
-  firefliesViewportKey = key;
-  fireflies = [];
+      firefliesViewportKey = key;
+      fireflies = [];
 
-  const count = 55; // cheap; bump to 80 if you want more
-  for (let i = 0; i < count; i++){
-    const s = i * 999.123;
-    fireflies.push({
-      x: rand01(s + 1.1) * w,
-      y: (0.20 + rand01(s + 2.2) * 0.65) * h, // avoid HUD-ish top/bottom a bit
-      r: 0.8 + rand01(s + 3.3) * 1.8,
-      vx: -0.015 + rand01(s + 4.4) * 0.03,
-      vy: -0.010 + rand01(s + 5.5) * 0.02,
-      tw: 1200 + rand01(s + 6.6) * 2400,
-      ph: rand01(s + 7.7) * Math.PI * 2,
+      const count = 60;
+      for (let i = 0; i < count; i++){
+        const s = i * 999.123;
+        fireflies.push({
+          x: rand01(s + 1.1) * w,
+          y: (0.20 + rand01(s + 2.2) * 0.65) * h,
+          r: 0.8 + rand01(s + 3.3) * 1.8,
+          vx: -0.015 + rand01(s + 4.4) * 0.03,
+          vy: -0.010 + rand01(s + 5.5) * 0.02,
+          tw: 1200 + rand01(s + 6.6) * 2400,
+          ph: rand01(s + 7.7) * Math.PI * 2,
+        });
+      }
+    }
+
+    function drawFireflies(ctx, night, t){
+      if (night <= 0.001) return;
+
+      const w = ctx.canvas.width;
+      const h = ctx.canvas.height;
+      ensureFireflies(w, h);
+
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.90 * night;
+
+      for (const f of fireflies){
+        const tt = (t / f.tw) + f.ph;
+
+        let x = f.x + (t * f.vx);
+        let y = f.y + (t * f.vy) + Math.sin(tt * 2.2) * 6;
+
+        x = ((x % (w + 40)) + (w + 40)) - 20;
+        y = ((y % (h + 40)) + (h + 40)) - 20;
+
+        const flick = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(tt * 6.0));
+        const r = f.r * (0.8 + 0.6 * flick);
+
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 7);
+        g.addColorStop(0, `rgba(220,255,230,${1.00 * flick})`);
+        g.addColorStop(0.35, `rgba(200,255,220,${0.35 * flick})`);
+        g.addColorStop(1, "rgba(190,255,210,0)");
+
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // ---------- Moon highlights on buildings ----------
+    function drawMoonHighlights(ctx, rect, moonX, strength){
+      if (strength <= 0.001) return;
+
+      const { x, y, w, h } = rect;
+      const fromLeft = moonX < (x + w * 0.5);
+
+      const x0 = fromLeft ? x - w * 0.10 : x + w * 1.10;
+      const x1 = fromLeft ? x + w * 0.55 : x + w * 0.45;
+
+      const g = ctx.createLinearGradient(x0, y, x1, y);
+      g.addColorStop(0, `rgba(140,185,255,0)`);
+      g.addColorStop(0.25, `rgba(150,200,255,${0.28 * strength})`);
+      g.addColorStop(1, `rgba(140,185,255,0)`);
+
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.65 * strength;
+
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, w, h);
+
+      ctx.restore();
+    }
+
+    // ---------- Live popup timer updater ----------
+    let popupLiveTimerHandle = null;
+    let popupPlotRef = null;
+
+    function stopPopupLiveTimer(){
+      if (popupLiveTimerHandle){
+        clearInterval(popupLiveTimerHandle);
+        popupLiveTimerHandle = null;
+      }
+      popupPlotRef = null;
+    }
+
+    function startPopupLiveTimer(plot){
+      stopPopupLiveTimer();
+      popupPlotRef = plot;
+
+      popupLiveTimerHandle = setInterval(() => {
+        if (!popupPlotRef || !isOpen(popup)){
+          stopPopupLiveTimer();
+          return;
+        }
+
+        buildings.tick?.(Date.now());
+
+        const st = getStatus(popupPlotRef.id);
+        if (!st) return;
+
+        const elBuild = document.getElementById("buildRemain");
+        const elUp    = document.getElementById("upgradeRemain");
+
+        if (st.constructing && elBuild) elBuild.textContent = fmtDuration(st.buildRemainingMs);
+        if (st.upgrading && elUp) elUp.textContent = fmtDuration(st.upgradeRemainingMs);
+
+        if (!st.constructing && !st.upgrading){
+          openBuildPopupForPlot(popupPlotRef);
+          stopPopupLiveTimer();
+        }
+      }, 200);
+    }
+
+    // ---------- HUD active line (prefer UPGRADING over BUILDING) ----------
+    function getActiveBuildLine(){
+      if (!state.settings.timersEnabled) return "Building (Timers OFF)";
+
+      let bestUpgrade = null;
+      let bestBuild = null;
+
+      for (const plot of CITY_PLOTS){
+        const p = buildings.getPlacedOnPlot?.(plot.id);
+        if (!p) continue;
+
+        const def = BUILDINGS?.[p.buildingId];
+        const name = def?.name || p.buildingId;
+
+        const now = Date.now();
+
+        if (p.upgradeEndAt){
+          const rem = Math.max(0, Number(p.upgradeEndAt) - now);
+          if (!bestUpgrade || rem < bestUpgrade.rem) bestUpgrade = { name, rem };
+        }
+
+        if (p.buildEndAt){
+          const rem = Math.max(0, Number(p.buildEndAt) - now);
+          if (!bestBuild || rem < bestBuild.rem) bestBuild = { name, rem };
+        }
+      }
+
+      if (bestUpgrade) return `Upgrading (${bestUpgrade.name} - ${fmtDuration(bestUpgrade.rem)})`;
+      if (bestBuild) return `Building (${bestBuild.name} - ${fmtDuration(bestBuild.rem)})`;
+      return "Building (Available builder)";
+    }
+
+    // ---- HUD refresh
+    function refreshHud(){
+      const prod = (typeof getProductionPerSecond === "function")
+        ? (getProductionPerSecond(buildings) || {})
+        : {};
+
+      elFood.querySelector(".val").textContent  = `🍖 ${fmt(state.resources.food)}`;
+      elWood.querySelector(".val").textContent  = `🪵 ${fmt(state.resources.wood)}`;
+      elStone.querySelector(".val").textContent = `🪨 ${fmt(state.resources.stone)}`;
+      elOre.querySelector(".val").textContent   = `⛏️ ${fmt(state.resources.ore)}`;
+      elGold.querySelector(".val").textContent  = `🪙 ${fmt(state.resources.gold)}`;
+
+      elRpsFood.textContent  = fmtRate(prod.food);
+      elRpsWood.textContent  = fmtRate(prod.wood);
+      elRpsStone.textContent = fmtRate(prod.stone);
+      elRpsOre.textContent   = fmtRate(prod.ore);
+      elRpsGold.textContent  = fmtRate(prod.gold);
+
+      const q = getQueueInfo();
+      elQueue.textContent = `Queue: ${q.active||0}/${q.max||2}`;
+      elTimers.textContent = `Timers: ${state.settings.timersEnabled ? "ON" : "OFF"}`;
+      elBuildLine.textContent = getActiveBuildLine();
+    }
+
+    // ---- popup rendering
+    let currentPlot = null;
+
+    function fmtCostPretty(cost){
+      if (!cost) return "?";
+      const parts=[];
+      if (cost.food)  parts.push(`F:${cost.food}`);
+      if (cost.wood)  parts.push(`W:${cost.wood}`);
+      if (cost.stone) parts.push(`S:${cost.stone}`);
+      if (cost.ore)   parts.push(`O:${cost.ore}`);
+      if (cost.gold)  parts.push(`G:${cost.gold}`);
+      return parts.join("  ") || "?";
+    }
+
+    function canAfford(cost){
+      if (!cost) return true;
+      for (const k in cost){
+        const need = Number(cost[k]||0);
+        if (need<=0) continue;
+        if ((state.resources?.[k]||0) < need) return false;
+      }
+      return true;
+    }
+
+    function openBuildPopupForPlot(plot){
+      currentPlot = plot;
+      const existing = getPlaced(plot.id);
+      const st = getStatus(plot.id);
+
+      buildGrid.innerHTML = "";
+
+      if (existing){
+        const lvl = existing.level ?? 1;
+        const def = BUILDINGS?.[existing.buildingId];
+        const name = def?.name || existing.buildingId;
+
+        const constructing = !!st?.constructing;
+        const upgrading    = !!st?.upgrading;
+
+        const chk = canUpgrade(plot.id);
+        const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
+        const affordable  = canAfford(upgradeCost);
+
+        const q = getQueueInfo();
+        const queueBlocked = state.settings.timersEnabled && q.full;
+
+        const disabled = constructing || upgrading || queueBlocked || (!chk.ok || !affordable || !upgradeCost);
+
+        let timerLine = "";
+        if (constructing) timerLine = `<div class="upReason">Under construction… <b id="buildRemain">${fmtDuration(st.buildRemainingMs)}</b> left</div>`;
+        if (upgrading)    timerLine = `<div class="upReason">Upgrading… <b id="upgradeRemain">${fmtDuration(st.upgradeRemainingMs)}</b> left</div>`;
+
+        buildTitle.textContent = `${name} (Lv ${lvl})`;
+
+        buildGrid.innerHTML = `
+          <div class="upCard">
+            <div class="upRow"><span>Current</span><b>Lv ${lvl}</b></div>
+            <div class="upRow"><span>Cost</span><span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
+
+            <button class="upBtn" id="btnDoUpgrade" type="button" ${disabled ? "disabled":""}>
+              ${upgrading ? "Upgrading…" : `Upgrade → Lv ${lvl+1}`}
+            </button>
+
+            ${timerLine}
+
+            ${(state.settings.timersEnabled && (constructing || upgrading)) ? `
+              <div class="speedRow">
+                <select class="speedSelect" id="speedupSelect">
+                  <option value="">Speed ups…</option>
+                  <option value="finish">Finish now</option>
+                  <option value="s25">Speed up 25%</option>
+                  <option value="s50">Speed up 50%</option>
+                </select>
+              </div>
+              <div class="upReason" style="margin-top:8px;">
+                Speed ups currently free (no cost yet). Later you can attach gems to these options.
+              </div>
+            ` : ""}
+
+            ${(!constructing && !upgrading && queueBlocked) ? `<div class="upReason">All ${q.max} builder queues are busy.</div>` : ""}
+            ${(!constructing && !upgrading && !chk.ok) ? `<div class="upReason">${chk.reason}</div>` : ""}
+            ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable) ? `<div class="upReason">Not enough resources</div>` : ""}
+          </div>
+        `;
+
+        const btn = document.getElementById("btnDoUpgrade");
+        btn?.addEventListener("click", async ()=>{
+          const st2 = getStatus(plot.id);
+          if (st2?.constructing || st2?.upgrading) return;
+
+          const res = await upgradePlot(plot.id);
+          if (res?.ok === false) return alert(res.reason || "Upgrade failed");
+
+          openBuildPopupForPlot(plot);
+          saveGame(buildings);
+        });
+
+        const sel = document.getElementById("speedupSelect");
+        sel?.addEventListener("change", ()=>{
+          const v = sel.value;
+          sel.value = "";
+
+          if (v === "finish"){
+            const r = buildings.finishPlotTimersNow?.(plot.id) || { ok:false, reason:"finishPlotTimersNow missing" };
+            if (r.ok === false) alert(r.reason || "Could not finish");
+          } else if (v === "s25"){
+            const r = buildings.applySpeedupToPlot?.(plot.id, 0.25) || { ok:false, reason:"applySpeedupToPlot missing" };
+            if (r.ok === false) alert(r.reason || "Could not speed up");
+          } else if (v === "s50"){
+            const r = buildings.applySpeedupToPlot?.(plot.id, 0.50) || { ok:false, reason:"applySpeedupToPlot missing" };
+            if (r.ok === false) alert(r.reason || "Could not speed up");
+          }
+
+          saveGame(buildings);
+          openBuildPopupForPlot(plot);
+        });
+
+      } else {
+        buildTitle.textContent = `Plot: ${plot.id} (Build)`;
+
+        const q = getQueueInfo();
+        const queueBlocked = state.settings.timersEnabled && q.full;
+
+        for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")){
+          const def = BUILDINGS[bKey];
+          const cost = def?.cost || null;
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "buildBtn";
+          btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCostPretty(cost)}` : ""}`;
+
+          const gate = canBuild(bKey);
+          if (!gate.ok){
+            btn.disabled = true;
+            btn.style.opacity = "0.35";
+            btn.title = gate.reason;
+          } else if (cost && !canAfford(cost)){
+            btn.disabled = true;
+            btn.style.opacity = "0.35";
+            btn.title = "Not enough resources";
+          } else if (queueBlocked){
+            btn.disabled = true;
+            btn.style.opacity = "0.35";
+            btn.title = `All ${q.max} builder queues are busy.`;
+          }
+
+          btn.addEventListener("click", async ()=>{
+            const r = await placeBuilding(plot.id, bKey);
+            if (r?.ok === false) return alert(r.reason || "Could not build.");
+
+            hideAllPanels();
+            saveGame(buildings);
+          });
+
+          buildGrid.appendChild(btn);
+        }
+      }
+
+      hideAllPanels();
+      popup.style.display = "block";
+      centerPanel(popup);
+      startPopupLiveTimer(plot);
+    }
+
+    // ---- Settings
+    btnSettings.addEventListener("click", ()=>{
+      userInteracted = true;
+      hideAllPanels();
+      settingsPanel.style.display = "block";
+      syncSettingsUI();
+      centerPanel(settingsPanel);
     });
-  }
-}
 
-function drawFireflies(ctx, night, t){
-  if (night <= 0.001) return;
+    settingsClose.addEventListener("click", ()=>{
+      settingsPanel.style.display = "none";
+    });
 
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
-  ensureFireflies(w, h);
+    timersToggle.addEventListener("change", ()=>{
+      state.settings.timersEnabled = !!timersToggle.checked;
+      syncSettingsUI();
 
-  ctx.save();
-  ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = 0.90 * night;
+      if (!state.settings.timersEnabled){
+        buildings.finishAllTimersNow?.();
+      }
+      saveGame(buildings);
+    });
 
-  for (const f of fireflies){
-    const tt = (t / f.tw) + f.ph;
+    finishTimersNow.addEventListener("click", ()=>{
+      buildings.finishAllTimersNow?.();
+      saveGame(buildings);
+    });
 
-    // drift + gentle bob
-    let x = f.x + (t * f.vx);
-    let y = f.y + (t * f.vy) + Math.sin(tt * 2.2) * 6;
+    // Save / Load / Reset
+    btnSave.addEventListener("click", ()=> saveGame(buildings));
+    btnLoad.addEventListener("click", ()=> loadGame());
+    btnReset.addEventListener("click", ()=>{
+      if (!confirm("Reset save and reload?")) return;
+      resetSave();
+    });
 
-    // wrap
-    x = ((x % (w + 40)) + (w + 40)) - 20;
-    y = ((y % (h + 40)) + (h + 40)) - 20;
+    buildClose.addEventListener("click", ()=>{
+      stopPopupLiveTimer();
+      popup.style.display = "none";
+    });
 
-    // flicker
-    const flick = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(tt * 6.0));
-    const r = f.r * (0.8 + 0.6 * flick);
+    // City / World placeholders
+    btnCity.addEventListener("click", ()=> console.log("City (already here)"));
+    btnWorld.addEventListener("click", ()=> alert("World view coming next 👀"));
 
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 7);
-    g.addColorStop(0, `rgba(190,255,210,${1.00 * flick})`);
-    g.addColorStop(0.35, `rgba(190,255,210,${0.35 * flick})`);
-    g.addColorStop(1, "rgba(190,255,210,0)");
+    // ---- Apply pending load if exists
+    async function applyPayload(data){
+      if (!data || typeof data !== "object") return false;
 
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r * 7, 0, Math.PI * 2);
-    ctx.fill();
-  }
+      ensureResKeys();
 
-  ctx.restore();
-}
+      if (data.resources){
+        state.resources.food  = Number(data.resources.food  ?? 0);
+        state.resources.wood  = Number(data.resources.wood  ?? 0);
+        state.resources.stone = Number(data.resources.stone ?? 0);
+        state.resources.ore   = Number(data.resources.ore   ?? 0);
+        state.resources.gold  = Number(data.resources.gold  ?? 0);
+      }
 
-// ---------- Moon highlights on buildings (cheap “specular”) ----------
-function drawMoonHighlights(ctx, rect, moonX, strength){
-  if (strength <= 0.001) return;
+      if (data.settings && typeof data.settings === "object"){
+        if (typeof data.settings.timersEnabled === "boolean"){
+          state.settings.timersEnabled = data.settings.timersEnabled;
+        }
+      }
 
-  const { x, y, w, h } = rect;
+      if (Array.isArray(data.placed)){
+        await buildings.hydrateFromSave?.(data.placed);
+      } else {
+        buildings.resetAllPlaced?.();
+      }
 
-  // highlight comes from the moon side (left/right), fades across sprite
-  const fromLeft = moonX < (x + w * 0.5);
+      await ensureTownhallHard();
+      syncSettingsUI();
+      refreshHud();
+      return true;
+    }
 
-  const x0 = fromLeft ? x - w * 0.10 : x + w * 1.10;
-  const x1 = fromLeft ? x + w * 0.55 : x + w * 0.45;
+    (async function bootLoad(){
+      hideAllPanels();
+      syncSettingsUI();
+      refreshHud();
 
-  const g = ctx.createLinearGradient(x0, y, x1, y);
-  g.addColorStop(0, `rgba(140,185,255,0)`);
-  g.addColorStop(0.25, `rgba(150,200,255,${0.28 * strength})`);
-  g.addColorStop(1, `rgba(140,185,255,0)`);
+      const pending = sessionStorage.getItem(PENDING_KEY);
+      if (!pending){
+        await ensureTownhallHard();
+        refreshHud();
+        return;
+      }
 
-  ctx.save();
-  ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = 0.65 * strength;
+      sessionStorage.removeItem(PENDING_KEY);
+      try{
+        const data = JSON.parse(pending);
+        await applyPayload(data);
+      }catch(e){
+        console.error("Pending load failed:", e);
+        await ensureTownhallHard();
+      } finally {
+        refreshHud();
+      }
+    })();
 
-  // clip to sprite rect (cheap silhouette-ish)
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
+    // ---- Plot click handler
+    scene.setOnPlotClick((plot)=>{
+      userInteracted = true;
+      if (isOpen(settingsPanel)) return;
+      openBuildPopupForPlot(plot);
+    });
 
-  ctx.fillStyle = g;
-  ctx.fillRect(x, y, w, h);
-
-  ctx.restore();
-}
-
-    // ---------- World overlay: wind + (sun shadows day only) + (moon shadows night) + buildings ----------
+    // ---------- World overlay: wind + clouds shadows + (sun shadows day) + (moon shadows night) + buildings ----------
     scene.setWorldOverlayRenderer((ctx, helpers)=>{
       const t = performance.now();
       const mapW = helpers?.map?.w ?? 512;
@@ -1290,10 +1682,8 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
 
       const s = getSunState(t, 90000);
 
-      // Sun shadows only above horizon; smooth fade in/out near horizon.
       const sunShadowStrength = clamp((s.altitude - 0.08) / 0.22, 0, 1);
 
-      // Moon is opposite the sun; only at night; also fades near horizon.
       const moonAltitude = Math.max(0, -s.altitude);
       const moonShadowStrength = clamp((moonAltitude - 0.08) / 0.22, 0, 1) * s.night;
 
@@ -1301,9 +1691,8 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
       const sunLenBase = s.sunLenBase;
       const noonness = s.noonness;
 
-      // Moon direction: opposite sun position; shadow goes away from moon
       const moonDir = { x: s.eastWest, y: 0.28 };
-      const moonLenBase = 0.55 + 0.55 * (1 - moonAltitude); // shorter when moon "high"
+      const moonLenBase = 0.55 + 0.55 * (1 - moonAltitude);
 
       drawGrassWind(ctx, mapW, mapH, t);
       drawCloudShadowsWorld(ctx, mapW, mapH, t, 0.85 * (0.35 + 0.65 * s.day));
@@ -1343,7 +1732,7 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
 
-        const overflowY = Number.isFinite(def?.overflowY) ? def.overflowY : 0.55; // 0.35..0.85
+        const overflowY = Number.isFinite(def?.overflowY) ? def.overflowY : 0.55;
         const shadowWidthMul = Number.isFinite(def?.shadowWidthMul) ? def.shadowWidthMul : 1.0;
         const shadowLenMul   = Number.isFinite(def?.shadowLenMul) ? def.shadowLenMul : 1.0;
         const shadowAnchorX  = Number.isFinite(def?.shadowAnchorX) ? def.shadowAnchorX : 0.52;
@@ -1361,9 +1750,9 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
         const feetY = y + h;
         const feetX = dx + dw * shadowAnchorX;
 
-        // ----- SUN SHADOWS (day only) -----
+        // SUN SHADOWS
         if (sunShadowStrength > 0.001){
-          const softness = clamp(1 - s.day, 0, 1); // low sun => softer
+          const softness = clamp(1 - s.day, 0, 1);
           const shadowLen = Math.max(0, dh * sunLenBase * shadowLenMul * sunShadowStrength);
           const shadowW0  = Math.max(10, dw * 0.70 * shadowWidthMul);
           const shadowW1  = shadowW0 * (0.35 + 0.20 * noonness);
@@ -1374,7 +1763,6 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
           ctx.save();
           ctx.globalCompositeOperation = "multiply";
 
-          // core shadow
           ctx.globalAlpha = 0.22 * sunShadowStrength;
           ctx.beginPath();
           ctx.moveTo(feetX - shadowW0 * 0.50, feetY);
@@ -1385,7 +1773,6 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
           ctx.fillStyle = "rgba(0,0,0,1)";
           ctx.fill();
 
-          // soft edge
           ctx.globalAlpha = (0.06 + 0.10 * softness) * sunShadowStrength;
           ctx.beginPath();
           ctx.moveTo(feetX - shadowW0 * 0.62, feetY);
@@ -1395,7 +1782,6 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
           ctx.closePath();
           ctx.fill();
 
-          // extra feather at very low sun
           if (softness > 0.35){
             ctx.globalAlpha = (0.025 + 0.05 * softness) * sunShadowStrength;
             ctx.beginPath();
@@ -1410,7 +1796,7 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
           ctx.restore();
         }
 
-        // ----- MOON SHADOWS (night only, subtle) -----
+        // MOON SHADOWS
         if (moonShadowStrength > 0.001){
           const mSoft = clamp(0.65 + 0.35 * (1 - moonAltitude), 0.65, 1);
           const mLen = Math.max(0, dh * moonLenBase * (0.75 * shadowLenMul) * moonShadowStrength);
@@ -1423,7 +1809,6 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
           ctx.save();
           ctx.globalCompositeOperation = "multiply";
 
-          // ultra faint core
           ctx.globalAlpha = 0.065 * moonShadowStrength;
           ctx.beginPath();
           ctx.moveTo(feetX - mW0 * 0.50, feetY);
@@ -1434,7 +1819,6 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
           ctx.fillStyle = "rgba(0,0,0,1)";
           ctx.fill();
 
-          // soft feather
           ctx.globalAlpha = 0.035 * moonShadowStrength;
           ctx.beginPath();
           ctx.moveTo(feetX - mW0 * (0.65 * mSoft), feetY);
@@ -1447,26 +1831,24 @@ function drawMoonHighlights(ctx, rect, moonX, strength){
           ctx.restore();
         }
 
-        // draw building
         ctx.drawImage(img, dx, dy, dw, dh);
-        // Moon specular highlights (night only)
-if (moonShadowStrength > 0.001){
-  const screenMoonX = (helpers?.worldToScreen)
-    ? helpers.worldToScreen(mapW * (0.15 + 0.70 * (1 - s.sunX01)), 0).x
-    : 0;
 
-  drawMoonHighlights(
-    ctx,
-    { x: dx, y: dy, w: dw, h: dh },
-    screenMoonX,
-    moonShadowStrength
-  );
-}
+        if (moonShadowStrength > 0.001){
+          const screenMoonX = (helpers?.worldToScreen)
+            ? helpers.worldToScreen(mapW * (0.15 + 0.70 * (1 - s.sunX01)), 0).x
+            : 0;
 
+          drawMoonHighlights(
+            ctx,
+            { x: dx, y: dy, w: dw, h: dh },
+            screenMoonX,
+            moonShadowStrength
+          );
+        }
       }
     });
 
-    // ---------- Screen overlay: sunrise/sunset/night hue + directional glow + moonlight rim ----------
+    // ---------- Screen overlay: grading + clouds + vignette + fireflies ----------
     scene.setScreenOverlayRenderer((ctx)=>{
       const t = performance.now();
       const w = ctx.canvas.width;
@@ -1560,11 +1942,12 @@ if (moonShadowStrength > 0.001){
         mg.addColorStop(1, "rgba(120,170,255,0)");
         ctx.fillStyle = mg;
         ctx.fillRect(0,0,w,h);
-         drawCloudsScreen(ctx, t, 0.55 + 0.55 * day + 0.25 * night);
-
       }
-     
 
+      // Clouds always, day stronger than night
+      drawCloudsScreen(ctx, t, 0.55 + 0.55 * day + 0.25 * night);
+
+      // Vignette
       ctx.globalCompositeOperation = "multiply";
       ctx.globalAlpha = 0.25 + 0.22 * night;
 
@@ -1578,263 +1961,14 @@ if (moonShadowStrength > 0.001){
       v.addColorStop(1, "rgba(0,0,0,1)");
       ctx.fillStyle = v;
       ctx.fillRect(0,0,w,h);
+
+      // Fireflies on top
       drawFireflies(ctx, night, t);
 
       ctx.restore();
     });
 
-    function refreshHud(){
-      elFood.textContent  = `🍖 ${fmt(state.resources.food)}`;
-      elWood.textContent  = `🪵 ${fmt(state.resources.wood)}`;
-      elStone.textContent = `🪨 ${fmt(state.resources.stone)}`;
-      elOre.textContent   = `⛏️ ${fmt(state.resources.ore)}`;
-      elGold.textContent  = `🪙 ${fmt(state.resources.gold)}`;
-
-      const q = getQueueInfo();
-      elQueue.textContent = `Queue: ${q.active||0}/${q.max||2}`;
-      elTimers.textContent = `Timers: ${state.settings.timersEnabled ? "ON" : "OFF"}`;
-    }
-
-    let currentPlot = null;
-
-    function fmtCostPretty(cost){
-      if (!cost) return "?";
-      const parts=[];
-      if (cost.food)  parts.push(`F:${cost.food}`);
-      if (cost.wood)  parts.push(`W:${cost.wood}`);
-      if (cost.stone) parts.push(`S:${cost.stone}`);
-      if (cost.ore)   parts.push(`O:${cost.ore}`);
-      if (cost.gold)  parts.push(`G:${cost.gold}`);
-      return parts.join("  ") || "?";
-    }
-
-    function canAfford(cost){
-      if (!cost) return true;
-      for (const k in cost){
-        const need = Number(cost[k]||0);
-        if (need<=0) continue;
-        if ((state.resources?.[k]||0) < need) return false;
-      }
-      return true;
-    }
-
-    function fmtDuration(ms){
-      const totalSec = Math.max(0, Math.ceil(ms / 1000));
-      const d = Math.floor(totalSec / 86400);
-      const h = Math.floor((totalSec % 86400) / 3600);
-      const m = Math.floor((totalSec % 3600) / 60);
-      const s = totalSec % 60;
-      if (d>0) return `${d}d ${h}h ${m}m`;
-      if (h>0) return `${h}h ${m}m`;
-      if (m>0) return `${m}m ${s}s`;
-      return `${s}s`;
-    }
-
-    function openBuildPopupForPlot(plot){
-      currentPlot = plot;
-      const existing = getPlaced(plot.id);
-      const st = getStatus(plot.id);
-
-      buildGrid.innerHTML = "";
-
-      if (existing){
-        const lvl = existing.level ?? 1;
-        const def = BUILDINGS?.[existing.buildingId];
-        const name = def?.name || existing.buildingId;
-
-        const constructing = !!st?.constructing;
-        const upgrading    = !!st?.upgrading;
-
-        const chk = canUpgrade(plot.id);
-        const upgradeCost = def?.upgradeCost ? def.upgradeCost(lvl) : null;
-        const affordable  = canAfford(upgradeCost);
-
-        const q = getQueueInfo();
-        const queueBlocked = state.settings.timersEnabled && q.full;
-
-        const disabled = constructing || upgrading || queueBlocked || (!chk.ok || !affordable || !upgradeCost);
-
-        let timerLine = "";
-        if (constructing) timerLine = `<div class="upReason">Under construction… <b>${fmtDuration(st.buildRemainingMs)}</b> left</div>`;
-        if (upgrading)    timerLine = `<div class="upReason">Upgrading… <b>${fmtDuration(st.upgradeRemainingMs)}</b> left</div>`;
-
-        buildTitle.textContent = `${name} (Lv ${lvl})`;
-
-        buildGrid.innerHTML = `
-          <div class="upCard">
-            <div class="upRow"><span>Current</span><b>Lv ${lvl}</b></div>
-            <div class="upRow"><span>Cost</span><span class="upCost">${fmtCostPretty(upgradeCost)}</span></div>
-
-            <button class="upBtn" id="btnDoUpgrade" type="button" ${disabled ? "disabled":""}>
-              ${upgrading ? "Upgrading…" : `Upgrade → Lv ${lvl+1}`}
-            </button>
-
-            ${timerLine}
-            ${(!constructing && !upgrading && queueBlocked) ? `<div class="upReason">All ${q.max} builder queues are busy.</div>` : ""}
-            ${(!constructing && !upgrading && !chk.ok) ? `<div class="upReason">${chk.reason}</div>` : ""}
-            ${(!constructing && !upgrading && chk.ok && upgradeCost && !affordable) ? `<div class="upReason">Not enough resources</div>` : ""}
-          </div>
-        `;
-
-        const btn = document.getElementById("btnDoUpgrade");
-        btn?.addEventListener("click", async ()=>{
-          const st2 = getStatus(plot.id);
-          if (st2?.constructing || st2?.upgrading) return;
-
-          const res = await upgradePlot(plot.id);
-          if (res?.ok === false) return alert(res.reason || "Upgrade failed");
-
-          openBuildPopupForPlot(plot);
-          saveGame(buildings);
-        });
-
-      } else {
-        buildTitle.textContent = `Plot: ${plot.id} (Build)`;
-
-        const q = getQueueInfo();
-        const queueBlocked = state.settings.timersEnabled && q.full;
-
-        for (const bKey of Object.keys(BUILDINGS).filter(k => k !== "townhall")){
-          const def = BUILDINGS[bKey];
-          const cost = def?.cost || null;
-
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "buildBtn";
-          btn.textContent = `${def?.name || bKey}${cost ? `\n${fmtCostPretty(cost)}` : ""}`;
-
-          const gate = canBuild(bKey);
-          if (!gate.ok){
-            btn.disabled = true;
-            btn.style.opacity = "0.35";
-            btn.title = gate.reason;
-          } else if (cost && !canAfford(cost)){
-            btn.disabled = true;
-            btn.style.opacity = "0.35";
-            btn.title = "Not enough resources";
-          } else if (queueBlocked){
-            btn.disabled = true;
-            btn.style.opacity = "0.35";
-            btn.title = `All ${q.max} builder queues are busy.`;
-          }
-
-          btn.addEventListener("click", async ()=>{
-            const r = await placeBuilding(plot.id, bKey);
-            if (r?.ok === false) return alert(r.reason || "Could not build.");
-
-            hideAllPanels();
-            saveGame(buildings);
-          });
-
-          buildGrid.appendChild(btn);
-        }
-      }
-
-      hideAllPanels();
-      popup.style.display = "block";
-      centerPanel(popup);
-    }
-
-    btnSettings.addEventListener("click", ()=>{
-      userInteracted = true;
-      hideAllPanels();
-      settingsPanel.style.display = "block";
-      syncSettingsUI();
-      centerPanel(settingsPanel);
-    });
-
-    settingsClose.addEventListener("click", ()=>{
-      settingsPanel.style.display = "none";
-    });
-
-    timersToggle.addEventListener("change", ()=>{
-      state.settings.timersEnabled = !!timersToggle.checked;
-      syncSettingsUI();
-
-      if (!state.settings.timersEnabled){
-        buildings.finishAllTimersNow?.();
-      }
-      saveGame(buildings);
-    });
-
-    finishTimersNow.addEventListener("click", ()=>{
-      buildings.finishAllTimersNow?.();
-      saveGame(buildings);
-    });
-
-    btnSave.addEventListener("click", ()=> saveGame(buildings));
-    btnLoad.addEventListener("click", ()=> loadGame());
-    btnReset.addEventListener("click", ()=>{
-      if (!confirm("Reset save and reload?")) return;
-      resetSave();
-    });
-
-    buildClose.addEventListener("click", ()=> popup.style.display = "none");
-
-    btnCity.addEventListener("click", ()=> console.log("City (already here)"));
-    btnWorld.addEventListener("click", ()=> alert("World view coming next 👀"));
-
-    async function applyPayload(data){
-      if (!data || typeof data !== "object") return false;
-
-      ensureResKeys();
-
-      if (data.resources){
-        state.resources.food  = Number(data.resources.food  ?? 0);
-        state.resources.wood  = Number(data.resources.wood  ?? 0);
-        state.resources.stone = Number(data.resources.stone ?? 0);
-        state.resources.ore   = Number(data.resources.ore   ?? 0);
-        state.resources.gold  = Number(data.resources.gold  ?? 0);
-      }
-
-      if (data.settings && typeof data.settings === "object"){
-        if (typeof data.settings.timersEnabled === "boolean"){
-          state.settings.timersEnabled = data.settings.timersEnabled;
-        }
-      }
-
-      if (Array.isArray(data.placed)){
-        await buildings.hydrateFromSave?.(data.placed);
-      } else {
-        buildings.resetAllPlaced?.();
-      }
-
-      await ensureTownhallHard();
-      syncSettingsUI();
-      refreshHud();
-      return true;
-    }
-
-    (async function bootLoad(){
-      hideAllPanels();
-      syncSettingsUI();
-      refreshHud();
-
-      const pending = sessionStorage.getItem(PENDING_KEY);
-      if (!pending){
-        await ensureTownhallHard();
-        refreshHud();
-        return;
-      }
-
-      sessionStorage.removeItem(PENDING_KEY);
-      try{
-        const data = JSON.parse(pending);
-        await applyPayload(data);
-      }catch(e){
-        console.error("Pending load failed:", e);
-        await ensureTownhallHard();
-      } finally {
-        refreshHud();
-      }
-    })();
-
-    scene.setOnPlotClick((plot)=>{
-      userInteracted = true;
-      if (isOpen(settingsPanel)) return;
-      openBuildPopupForPlot(plot);
-    });
-
+    // ---- main loop
     let lastFrameT = performance.now();
     let hudAcc = 0;
 
@@ -1843,10 +1977,23 @@ if (moonShadowStrength > 0.001){
       lastFrameT = t;
 
       scene.update();
+
+      // ✅ timers finalize here
+      buildings.tick?.(Date.now());
+
+      // ✅ economy: support updateEconomy(dt, buildings) OR updateEconomy(dt)
+      try{
+        if (typeof updateEconomy === "function"){
+          if (updateEconomy.length >= 2) updateEconomy(dt, buildings);
+          else updateEconomy(dt);
+        }
+      }catch(e){
+        console.error("updateEconomy failed:", e);
+      }
+
       scene.render();
 
       processTrainingQueues?.();
-      updateEconomy(dt);
 
       hudAcc += dt;
       if (hudAcc >= 0.2){
@@ -1858,12 +2005,14 @@ if (moonShadowStrength > 0.001){
     }
     requestAnimationFrame(frame);
 
+    // keep panels centered on rotate/resize
     window.addEventListener("resize", ()=>{
       if (isOpen(popup)) centerPanel(popup);
       if (isOpen(settingsPanel)) centerPanel(settingsPanel);
       if (isOpen(barracksPanel)) centerPanel(barracksPanel);
     });
 
+    // autosave every 10s
     setInterval(()=>{ try{ saveGame(buildings); }catch{} }, 10000);
   </script>
 </body>
